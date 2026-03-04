@@ -300,8 +300,8 @@ sudo systemctl stop room_guard
 
 ### How it works
 
-1. **Initialization**: Set up GPIO pins (input for PIR, output for LED + buzzer). Register edge-detection callback on the PIR pin.
-2. **Waiting**: The main thread sleeps while the GPIO library watches for a RISING edge on GPIO 17.
+1. **Initialization**: Set up GPIO devices using `gpiozero` (MotionSensor for PIR, LED and OutputDevice for outputs). Register a motion callback on the PIR sensor.
+2. **Waiting**: The main thread sleeps while `gpiozero` watches for motion on GPIO 17.
 3. **Motion detected**: The callback fires — LED and buzzer are turned ON. A timestamp is logged.
 4. **Cooldown**: After the configured cooldown period (default 5s), LED and buzzer are turned OFF.
 5. **Repeat**: System returns to waiting state.
