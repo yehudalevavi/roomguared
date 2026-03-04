@@ -220,12 +220,15 @@ scp -r src/ config/ requirements.txt pi@room-guard.local:~/rpiProject/
 
 ```bash
 cd ~/rpiProject
+python3 -m venv .venv
+source .venv/bin/activate
 pip3 install -r requirements.txt
 ```
 
 ### Run manually
 
 ```bash
+source .venv/bin/activate
 python3 src/room_guard.py
 ```
 
