@@ -22,7 +22,9 @@ except ImportError:
 PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
 LED_PIN = 27     # GPIO 27 (Physical pin 13) — LED anode via 220Ω
 BUZZER_PIN = 22  # GPIO 22 (Physical pin 15) — Active buzzer (+)
-COOLDOWN = 5     # Seconds to keep LED/buzzer on after detection
+COOLDOWN = 10    # Seconds to wait after alert before next detection
+BEEP_COUNT = 3   # Number of beep/flash cycles on detection
+BEEP_DURATION = 0.5  # Seconds each beep/flash lasts
 
 # --- State ---
 _running = True
@@ -49,12 +51,17 @@ def shutdown(signum: int = None, frame=None) -> None:
 def motion_detected(sensor: MotionSensor) -> None:
     """Callback triggered when PIR sensor detects motion."""
     log("MOTION DETECTED!")
-    led.on()
-    buzzer.on()
+    for i in range(BEEP_COUNT):
+        led.on()
+        buzzer.on()
+        time.sleep(BEEP_DURATION)
+        led.off()
+        buzzer.off()
+        if i < BEEP_COUNT - 1:
+            time.sleep(BEEP_DURATION)
+    log(f"Cooldown {COOLDOWN}s...")
     time.sleep(COOLDOWN)
-    led.off()
-    buzzer.off()
-    log(f"Alert off after {COOLDOWN}s cooldown. Watching...")
+    log("Watching...")
 
 
 # --- Devices (module-level so shutdown() can access them) ---
@@ -72,7 +79,7 @@ def main() -> None:
     print(f"[Room Guard] PIR sensor on GPIO {PIR_PIN}")
     print(f"[Room Guard] LED on GPIO {LED_PIN}")
     print(f"[Room Guard] Buzzer on GPIO {BUZZER_PIN}")
-    print(f"[Room Guard] Cooldown: {COOLDOWN}s")
+    print(f"[Room Guard] Alert: {BEEP_COUNT}x {BEEP_DURATION}s beeps, {COOLDOWN}s cooldown")
     print("[Room Guard] Waiting for motion...")
     print()
 
