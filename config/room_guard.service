@@ -1,0 +1,16 @@
+[Unit]
+Description=Room Guard — Motion Detection Alarm
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/rpiProject
+ExecStart=/usr/bin/python3 /home/pi/rpiProject/src/room_guard.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
