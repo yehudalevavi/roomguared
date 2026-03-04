@@ -6,6 +6,7 @@ After=multi-user.target
 Type=simple
 User=yehudalevavi
 WorkingDirectory=/home/yehudalevavi/rpiProject
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/home/yehudalevavi/rpiProject/.venv/bin/python3 /home/yehudalevavi/rpiProject/src/room_guard.py
 Restart=on-failure
 RestartSec=5
