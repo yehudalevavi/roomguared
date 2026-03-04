@@ -30,7 +30,7 @@ Connect the PIR sensor, LED, and buzzer to the GPIO pins. See the [wiring guide]
 ### 3. Deploy the Code
 
 ```bash
-ssh pi@roomguard.local
+ssh pi@room-guard.local
 cd ~/rpiProject
 pip3 install -r requirements.txt
 ```

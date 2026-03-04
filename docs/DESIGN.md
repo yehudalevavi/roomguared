@@ -64,7 +64,7 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 4. **Choose Storage**: Select your microSD card.
 
 5. **Configure settings** (click the ⚙️ gear icon):
-   - ☑️ Set hostname: `roomguard`
+   - ☑️ Set hostname: `room-guard`
    - ☑️ Enable SSH → Use password authentication
    - ☑️ Set username and password (e.g., `pi` / `your-password`)
    - ☑️ Configure Wi-Fi:
@@ -90,10 +90,10 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 From your computer's terminal:
 
 ```bash
-ssh pi@roomguard.local
+ssh pi@room-guard.local
 ```
 
-> If `roomguard.local` doesn't work, find the Pi's IP address from your router's admin page and use `ssh pi@<IP_ADDRESS>`.
+> If `room-guard.local` doesn't work, find the Pi's IP address from your router's admin page and use `ssh pi@<IP_ADDRESS>`.
 
 ### Update the system
 
@@ -213,7 +213,7 @@ cd rpiProject
 Or copy files via SCP from your computer:
 
 ```bash
-scp -r src/ config/ requirements.txt pi@roomguard.local:~/rpiProject/
+scp -r src/ config/ requirements.txt pi@room-guard.local:~/rpiProject/
 ```
 
 ### Install dependencies
@@ -310,7 +310,7 @@ sudo systemctl stop room_guard
 
 | Problem | Solution |
 |---------|----------|
-| Can't SSH to `roomguard.local` | Check Wi-Fi credentials, try the IP address instead |
+| Can't SSH to `room-guard.local` | Check Wi-Fi credentials, try the IP address instead |
 | PIR sensor always HIGH | Wait 30–60s after powering on (calibration period). Adjust sensitivity pot. |
 | PIR sensor never triggers | Check wiring (VCC to 5V, not 3.3V). Try adjusting sensitivity clockwise. |
 | LED doesn't light | Check polarity (long leg = +). Verify resistor connection. |
