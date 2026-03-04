@@ -24,7 +24,7 @@ LED_PIN = 27     # GPIO 27 (Physical pin 13) — LED anode via 220Ω
 BUZZER_PIN = 22  # GPIO 22 (Physical pin 15) — Active buzzer (+)
 COOLDOWN = 10    # Seconds to wait after alert before next detection
 BEEP_COUNT = 3   # Number of beep/flash cycles on detection
-BEEP_DURATION = 0.5  # Seconds each beep/flash lasts
+BEEP_DURATION = 0.333  # Seconds each beep/flash lasts (1.5x faster)
 
 # --- State ---
 _running = True
@@ -84,8 +84,8 @@ def main() -> None:
     print()
 
     # PIR sensors need time to calibrate
-    log("PIR sensor calibrating (30s)...")
-    time.sleep(30)
+    log("PIR sensor calibrating (40s)...")
+    time.sleep(40)
     log("PIR sensor ready!")
 
     # Register motion callback
