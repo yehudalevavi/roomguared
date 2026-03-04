@@ -14,7 +14,8 @@
 6. [Step 4 — Deploy and Run the Application](#step-4--deploy-and-run-the-application)
 7. [Step 5 — Auto-Start on Boot](#step-5--auto-start-on-boot)
 8. [Application Architecture](#application-architecture)
-9. [Troubleshooting](#troubleshooting)
+9. [Debugging on the Raspberry Pi](#debugging-on-the-raspberry-pi)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -206,21 +207,23 @@ On your Raspberry Pi:
 
 ```bash
 cd ~
-git clone <your-repo-url> rpiProject
-cd rpiProject
+git clone <your-repo-url> roomguared
+cd roomguared
 ```
 
 Or copy files via SCP from your computer:
 
 ```bash
-scp -r src/ config/ requirements.txt pi@room-guard.local:~/rpiProject/
+scp -r src/ config/ requirements.txt yehudalevavi@room-guard:~/roomguared/
 ```
 
 ### Install dependencies
 
+> **Note:** The venv must be created with `--system-site-packages` so it can access the system-installed `lgpio` package (required by `gpiozero`).
+
 ```bash
-cd ~/rpiProject
-python3 -m venv .venv
+cd ~/roomguared
+python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
 pip3 install -r requirements.txt
 ```
@@ -309,14 +312,52 @@ sudo systemctl stop room_guard
 
 ---
 
+## Debugging on the Raspberry Pi
+
+### SSH Access
+
+Connect to the Raspberry Pi from your development machine:
+
+```bash
+ssh yehudalevavi@room-guard
+```
+
+> If `room-guard` doesn't resolve, try `room-guard.local` or the Pi's IP address.
+
+### Project location on the Pi
+
+The application is deployed at:
+
+```
+/home/yehudalevavi/roomguared/
+```
+
+### Quick debug workflow
+
+```bash
+ssh yehudalevavi@room-guard
+cd ~/roomguared
+source .venv/bin/activate
+python3 src/room_guard.py
+```
+
+### View service logs
+
+```bash
+ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
+```
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Can't SSH to `room-guard.local` | Check Wi-Fi credentials, try the IP address instead |
+| Can't SSH to `room-guard` | Check Wi-Fi credentials, try `room-guard.local` or the IP address instead |
 | PIR sensor always HIGH | Wait 30–60s after powering on (calibration period). Adjust sensitivity pot. |
 | PIR sensor never triggers | Check wiring (VCC to 5V, not 3.3V). Try adjusting sensitivity clockwise. |
 | LED doesn't light | Check polarity (long leg = +). Verify resistor connection. |
 | Buzzer doesn't sound | Check polarity (+ to GPIO). Some buzzers have a tiny sticker on top — remove it. |
 | `Permission denied` on GPIO | Run `sudo usermod -aG gpio $USER` and re-login. Or run with `sudo`. |
+| `lgpio` import error in venv | Recreate venv with `python3 -m venv --system-site-packages .venv` |
 | Service won't start | Check `journalctl -u room_guard -e` for errors. Verify file paths in .service file. |
