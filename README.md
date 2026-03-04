@@ -30,12 +30,22 @@ Connect the PIR sensor, LED, and buzzer to the GPIO pins. See the [wiring guide]
 ### 3. Deploy the Code
 
 ```bash
-ssh pi@room-guard.local
+ssh yehudalevavi@room-guard.local
 cd ~/rpiProject
 pip3 install -r requirements.txt
 ```
 
-### 4. Run It!
+### 4. Test the Outputs
+
+Before running the full app, verify your LED and buzzer wiring:
+
+```bash
+python3 src/test_outputs.py
+```
+
+The LED should light up and the buzzer should sound in sequence. If not, check your wiring (see [troubleshooting](docs/DESIGN.md#troubleshooting)).
+
+### 5. Run It!
 
 ```bash
 python3 src/room_guard.py
@@ -43,7 +53,7 @@ python3 src/room_guard.py
 
 Wave your hand in front of the sensor — the LED should light up and the buzzer should sound! 🎉
 
-### 5. Auto-Start on Boot (Optional)
+### 6. Auto-Start on Boot (Optional)
 
 ```bash
 sudo cp config/room_guard.service /etc/systemd/system/

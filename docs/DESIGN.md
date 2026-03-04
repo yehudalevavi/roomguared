@@ -91,10 +91,10 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 From your computer's terminal:
 
 ```bash
-ssh pi@room-guard.local
+ssh yehudalevavi@room-guard.local
 ```
 
-> If `room-guard.local` doesn't work, find the Pi's IP address from your router's admin page and use `ssh pi@<IP_ADDRESS>`.
+> If `room-guard.local` doesn't work, find the Pi's IP address from your router's admin page and use `ssh yehudalevavi@<IP_ADDRESS>`.
 
 ### Update the system
 
@@ -207,14 +207,14 @@ On your Raspberry Pi:
 
 ```bash
 cd ~
-git clone <your-repo-url> roomguared
-cd roomguared
+git clone <your-repo-url> rpiProject
+cd rpiProject
 ```
 
 Or copy files via SCP from your computer:
 
 ```bash
-scp -r src/ config/ requirements.txt yehudalevavi@room-guard:~/roomguared/
+scp -r src/ config/ requirements.txt yehudalevavi@room-guard:~/rpiProject/
 ```
 
 ### Install dependencies
@@ -222,11 +222,39 @@ scp -r src/ config/ requirements.txt yehudalevavi@room-guard:~/roomguared/
 > **Note:** The venv must be created with `--system-site-packages` so it can access the system-installed `lgpio` package (required by `gpiozero`).
 
 ```bash
-cd ~/roomguared
+cd ~/rpiProject
 python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
 pip3 install -r requirements.txt
 ```
+
+### Test the outputs
+
+Before running the full application, verify that the LED and buzzer are wired correctly:
+
+```bash
+source .venv/bin/activate
+python3 src/test_outputs.py
+```
+
+You should see:
+
+```
+=== Output Test ===
+
+1) LED on for 2 seconds...
+   LED off.
+
+2) Buzzer on for 1 second...
+   Buzzer off.
+
+3) Both on together for 2 seconds...
+   Both off.
+
+=== Test complete ===
+```
+
+If the LED doesn't light up or the buzzer doesn't sound, check the [Troubleshooting](#troubleshooting) section.
 
 ### Run manually
 
@@ -329,14 +357,14 @@ ssh yehudalevavi@room-guard
 The application is deployed at:
 
 ```
-/home/yehudalevavi/roomguared/
+/home/yehudalevavi/rpiProject/
 ```
 
 ### Quick debug workflow
 
 ```bash
 ssh yehudalevavi@room-guard
-cd ~/roomguared
+cd ~/rpiProject
 source .venv/bin/activate
 python3 src/room_guard.py
 ```

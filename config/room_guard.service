@@ -4,9 +4,9 @@ After=multi-user.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/rpiProject
-ExecStart=/home/pi/rpiProject/.venv/bin/python3 /home/pi/rpiProject/src/room_guard.py
+User=yehudalevavi
+WorkingDirectory=/home/yehudalevavi/rpiProject
+ExecStart=/home/yehudalevavi/rpiProject/.venv/bin/python3 /home/yehudalevavi/rpiProject/src/room_guard.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
