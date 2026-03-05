@@ -170,7 +170,50 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 6 (Optional/Bonus): Photoresistor Light Level
+## Phase 6: Passive Buzzer with Melodies & Sound Cues
+
+**Goal:** Replace the active buzzer with the passive buzzer to play real melodies and distinct audio cues for different events.
+
+**Why:** The active buzzer can only make one tone (on/off). The passive buzzer can play any frequency, enabling recognizable melodies for the alarm and short sound cues for other system events.
+
+**New wiring (swap 1 wire):**
+
+| Change | From | To |
+|--------|------|----|
+| Disconnect active buzzer from GPIO 22 | Active buzzer (+) | — |
+| Connect passive buzzer to GPIO 22 | Passive buzzer (+) | RPi Pin 15 (GPIO 22) |
+| Connect passive buzzer GND | Passive buzzer (−) | RPi Pin 9 (GND) |
+
+> Same pin (GPIO 22), just swap the buzzer component. The passive buzzer is slightly larger and has **no** white sticker/marking on top (unlike the active buzzer which has one).
+
+**Software:**
+- Create `src/buzzer.py` — a reusable buzzer module with:
+  - `play_tone(frequency, duration)` — play a single tone using PWM
+  - `play_melody(notes)` — play a sequence of (frequency, duration) tuples
+  - Predefined melodies:
+    - `MELODY_ALARM` — urgent siren pattern for motion detection
+    - `MELODY_STARTUP` — friendly ascending jingle on boot
+    - `MELODY_ARM` — short confirmation beep when system starts watching
+    - `MELODY_DISARM` — descending tone when system stops (Ctrl+C / service stop)
+    - `MELODY_SENSOR_ERROR` — low double-beep when a sensor read fails
+- Create `src/test_buzzer.py` — hardware test that plays each melody in sequence
+- Create `tests/test_buzzer_unit.py` — unit tests for tone/melody logic
+- Update `room_guard.py` to use the new buzzer module:
+  - Motion detected → `MELODY_ALARM`
+  - Startup complete → `MELODY_STARTUP`
+  - Shutdown → `MELODY_DISARM`
+  - DHT11/RTC read failure → `MELODY_SENSOR_ERROR` (if dashboard is integrated)
+
+**Validation:**
+- ✅ Each melody plays distinctly and is easy to tell apart
+- ✅ Tones sound at correct pitch (not just clicking)
+- ✅ Motion alert melody is noticeably urgent vs. friendly startup jingle
+- ✅ Existing LED behavior is unaffected
+- ✅ Unit tests pass without hardware
+
+---
+
+## Phase 7 (Optional/Bonus): Photoresistor Light Level
 
 **Goal:** Add light level sensing to the dashboard.
 
@@ -190,7 +233,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 |-----------|-----------|-------------|-----------|
 | PIR Sensor | GPIO 17 | Pin 11 | INPUT |
 | LED | GPIO 27 | Pin 13 | OUTPUT |
-| Buzzer | GPIO 22 | Pin 15 | OUTPUT |
+| Buzzer (passive) | GPIO 22 | Pin 15 | PWM OUTPUT |
 | DHT11 Data | GPIO 4 | Pin 7 | INPUT |
 | LCD RS | GPIO 26 | Pin 37 | OUTPUT |
 | LCD E | GPIO 19 | Pin 35 | OUTPUT |
