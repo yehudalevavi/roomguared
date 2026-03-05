@@ -144,6 +144,9 @@ Log out and back in for the group change to take effect.
 | LED (−)          | —         | Pin 14 (GND)| GROUND    |
 | Buzzer (+)       | GPIO 22   | Pin 15      | OUTPUT    |
 | Buzzer (−)       | —         | Pin 9 (GND) | GROUND    |
+| DHT11 DATA       | GPIO 4    | Pin 7       | INPUT     |
+| DHT11 VCC        | —         | Pin 2 (5V)  | POWER     |
+| DHT11 GND        | —         | Pin 9 (GND) | GROUND    |
 
 ### Wiring Diagram
 
@@ -151,11 +154,12 @@ Log out and back in for the group change to take effect.
     Raspberry Pi 4 GPIO Header
     (Pin 1 = top-left, Pin 2 = top-right)
 
-    3V3  (1) (2)  5V ─────────────────── PIR VCC (red wire)
+    3V3  (1) (2)  5V ─────────────────── PIR VCC (red) + DHT11 VCC (red)
   GPIO2  (3) (4)  5V
   GPIO3  (5) (6)  GND ────────────────── PIR GND (black wire)
+         ┌──────────────────────────────── DHT11 DATA (yellow wire)
   GPIO4  (7) (8)  GPIO14
-    GND  (9) (10) GPIO15
+    GND  (9) (10) GPIO15  ───────────── DHT11 GND (black) + Buzzer (−)
          ┌──────────────────────────────── PIR OUT (yellow wire)
   GPIO17 (11)(12) GPIO18
          ┌──────────────────────────────── LED Anode (+) via 220Ω resistor
@@ -183,6 +187,25 @@ Log out and back in for the group change to take effect.
 1. Place the buzzer on the breadboard.
 2. Connect the buzzer's **(+) pin** to **Pin 15 (GPIO 22)**.
 3. Connect the buzzer's **(−) pin** to **Pin 9 (GND)**.
+
+#### DHT11 Temperature & Humidity Sensor
+1. The DHT11 module (from the Elegoo kit) has 3 pins labeled **+**, **out**, and **−**.
+2. Connect **+** (VCC) to **Pin 2 (5V)** using a red jumper wire (can share the breadboard rail with PIR VCC).
+3. Connect **out** (DATA) to **Pin 7 (GPIO 4)** using a yellow/green jumper wire.
+4. Connect **−** (GND) to **Pin 9 (GND)** using a black jumper wire.
+
+> The Elegoo DHT11 module has a built-in 10KΩ pull-up resistor — no extra resistor needed.
+
+##### Testing the DHT11
+
+After wiring, run the hardware test:
+
+```bash
+source .venv/bin/activate
+python3 src/test_dht11.py
+```
+
+You should see 10 readings with temperature (°C) and humidity (%). At least 8/10 should succeed. If not, check the [Troubleshooting](#troubleshooting) section.
 
 ### PIR Sensor Adjustment
 
@@ -225,6 +248,7 @@ scp -r src/ config/ requirements.txt yehudalevavi@room-guard:~/rpiProject/
 cd ~/rpiProject
 python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
+sudo apt install -y libgpiod2
 pip3 install -r requirements.txt
 ```
 
@@ -388,4 +412,6 @@ ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
 | Buzzer doesn't sound | Check polarity (+ to GPIO). Some buzzers have a tiny sticker on top — remove it. |
 | `Permission denied` on GPIO | Run `sudo usermod -aG gpio $USER` and re-login. Or run with `sudo`. |
 | `lgpio` import error in venv | Recreate venv with `python3 -m venv --system-site-packages .venv` |
+| DHT11 reads all fail | Check DATA wire is on Pin 7 (GPIO 4). Ensure VCC is on 5V. Install `libgpiod2`: `sudo apt install -y libgpiod2` |
+| DHT11 reads are flaky | Normal — the DHT11 fails ~10-20% of reads. The sensor module retries automatically. |
 | Service won't start | Check `journalctl -u room_guard -e` for errors. Verify file paths in .service file. |
