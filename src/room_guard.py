@@ -23,8 +23,31 @@ PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
 LED_PIN = 27     # GPIO 27 (Physical pin 13) — LED anode via 220Ω
 BUZZER_PIN = 22  # GPIO 22 (Physical pin 15) — Active buzzer (+)
 COOLDOWN = 10    # Seconds to wait after alert before next detection
-BEEP_COUNT = 3   # Number of beep/flash cycles on detection
-BEEP_DURATION = 0.333  # Seconds each beep/flash lasts (1.5x faster)
+
+# Rhythmic alert melody (~5 seconds total)
+# Each tuple: (buzzer_on_seconds, pause_seconds)
+MELODY = [
+    # Quick triple tap
+    (0.12, 0.08),
+    (0.12, 0.08),
+    (0.12, 0.30),
+    # Double tap
+    (0.20, 0.12),
+    (0.20, 0.50),
+    # Quick triple tap
+    (0.12, 0.08),
+    (0.12, 0.08),
+    (0.12, 0.30),
+    # Double tap
+    (0.20, 0.12),
+    (0.20, 0.50),
+    # Finale: accelerando into long beep
+    (0.08, 0.05),
+    (0.08, 0.05),
+    (0.08, 0.05),
+    (0.08, 0.05),
+    (0.80, 0.00),
+]
 
 # --- State ---
 _running = True
@@ -51,14 +74,14 @@ def shutdown(signum: int = None, frame=None) -> None:
 def motion_detected(sensor: MotionSensor) -> None:
     """Callback triggered when PIR sensor detects motion."""
     log("MOTION DETECTED!")
-    for i in range(BEEP_COUNT):
+    for on_time, off_time in MELODY:
         led.on()
         buzzer.on()
-        time.sleep(BEEP_DURATION)
+        time.sleep(on_time)
         led.off()
         buzzer.off()
-        if i < BEEP_COUNT - 1:
-            time.sleep(BEEP_DURATION)
+        if off_time > 0:
+            time.sleep(off_time)
     log(f"Cooldown {COOLDOWN}s...")
     time.sleep(COOLDOWN)
     log("Watching...")
@@ -79,7 +102,7 @@ def main() -> None:
     print(f"[Room Guard] PIR sensor on GPIO {PIR_PIN}")
     print(f"[Room Guard] LED on GPIO {LED_PIN}")
     print(f"[Room Guard] Buzzer on GPIO {BUZZER_PIN}")
-    print(f"[Room Guard] Alert: {BEEP_COUNT}x {BEEP_DURATION}s beeps, {COOLDOWN}s cooldown")
+    print(f"[Room Guard] Alert: ~5s melody, {COOLDOWN}s cooldown")
     print("[Room Guard] Waiting for motion...")
     print()
 
