@@ -133,20 +133,29 @@ Log out and back in for the group change to take effect.
 
 ## Step 3 — Wiring the Components
 
+### Breadboard Power Rails
+
+Instead of running individual power/ground wires from each component back to the Raspberry Pi, we use the breadboard's **power rails** (the long `+` and `−` strips along the edges):
+
+1. Connect **one wire** from RPi **Pin 2 (5V)** → breadboard **+ rail** (red strip)
+2. Connect **one wire** from RPi **Pin 6 (GND)** → breadboard **− rail** (blue strip)
+
+All components then tap power and ground from these rails. This keeps wiring clean and uses only 2 RPi pins for power instead of many.
+
+> 💡 Most full-size breadboards have rails on **both sides**. If your wires need to reach both sides, add a short jumper bridging the left `+` to right `+` rail, and left `−` to right `−` rail.
+
 ### GPIO Pin Assignments (BCM Numbering)
 
 | Component        | GPIO Pin  | Physical Pin | Direction |
 |------------------|-----------|-------------|-----------|
+| 5V Power Rail    | —         | Pin 2 (5V)  | POWER     |
+| GND Rail         | —         | Pin 6 (GND) | GROUND    |
 | PIR Sensor OUT   | GPIO 17   | Pin 11      | INPUT     |
-| PIR Sensor VCC   | —         | Pin 2 (5V)  | POWER     |
-| PIR Sensor GND   | —         | Pin 6 (GND) | GROUND    |
 | LED (+) via 220Ω | GPIO 27   | Pin 13      | OUTPUT    |
-| LED (−)          | —         | Pin 14 (GND)| GROUND    |
 | Buzzer (+)       | GPIO 22   | Pin 15      | OUTPUT    |
-| Buzzer (−)       | —         | Pin 9 (GND) | GROUND    |
 | DHT11 DATA       | GPIO 4    | Pin 7       | INPUT     |
-| DHT11 VCC        | —         | Pin 2 (5V)  | POWER     |
-| DHT11 GND        | —         | Pin 9 (GND) | GROUND    |
+
+> All component VCC pins connect to the breadboard **+ rail**, and all GND pins to the **− rail**.
 
 ### Wiring Diagram
 
@@ -154,45 +163,67 @@ Log out and back in for the group change to take effect.
     Raspberry Pi 4 GPIO Header
     (Pin 1 = top-left, Pin 2 = top-right)
 
-    3V3  (1) (2)  5V ─────────────────── PIR VCC (red) + DHT11 VCC (red)
+    3V3  (1) (2)  5V ─────────────────── Breadboard + rail (red)
   GPIO2  (3) (4)  5V
-  GPIO3  (5) (6)  GND ────────────────── PIR GND (black wire)
+  GPIO3  (5) (6)  GND ────────────────── Breadboard − rail (blue)
          ┌──────────────────────────────── DHT11 DATA (yellow wire)
   GPIO4  (7) (8)  GPIO14
-    GND  (9) (10) GPIO15  ───────────── DHT11 GND (black) + Buzzer (−)
+    GND  (9) (10) GPIO15
          ┌──────────────────────────────── PIR OUT (yellow wire)
   GPIO17 (11)(12) GPIO18
          ┌──────────────────────────────── LED Anode (+) via 220Ω resistor
-  GPIO27 (13)(14) GND ────────────────── LED Cathode (−)
+  GPIO27 (13)(14) GND
          ┌──────────────────────────────── Buzzer (+)
   GPIO22 (15)(16) GPIO23
     3V3  (17)(18) GPIO24
+
+
+    Breadboard (830 tie-points)
+    ┌──────────────────────────────────────────────┐
+    │  + rail ──── 5V from RPi Pin 2               │
+    │  − rail ──── GND from RPi Pin 6              │
+    │                                               │
+    │  PIR VCC ────── + rail                        │
+    │  PIR GND ────── − rail                        │
+    │                                               │
+    │  LED (−) ────── − rail                        │
+    │                                               │
+    │  Buzzer (−) ─── − rail                        │
+    │                                               │
+    │  DHT11 (+) ──── + rail                        │
+    │  DHT11 (−) ──── − rail                        │
+    └──────────────────────────────────────────────┘
 ```
 
 ### Step-by-Step Wiring
 
 > ⚠️ **Always wire with the Raspberry Pi powered OFF!**
 
+#### Step A — Breadboard Power Rails
+1. Connect RPi **Pin 2 (5V)** to the breadboard **+ rail** (red strip) using a red jumper wire.
+2. Connect RPi **Pin 6 (GND)** to the breadboard **− rail** (blue strip) using a black jumper wire.
+3. If using both sides of the breadboard, bridge the `+` rails together and the `−` rails together with short jumper wires.
+
 #### PIR Sensor (HC-SR501)
-1. Connect **VCC** (usually the left pin, marked +) to **Pin 2 (5V)** using a red jumper wire.
+1. Connect **VCC** (usually the left pin, marked +) to the breadboard **+ rail**.
 2. Connect **OUT** (middle pin) to **Pin 11 (GPIO 17)** using a yellow/green jumper wire.
-3. Connect **GND** (right pin, marked −) to **Pin 6 (GND)** using a black jumper wire.
+3. Connect **GND** (right pin, marked −) to the breadboard **− rail**.
 
 #### LED
 1. Place the LED on the breadboard.
 2. Connect a **220Ω resistor** from **Pin 13 (GPIO 27)** to the LED's **long leg (anode, +)**.
-3. Connect the LED's **short leg (cathode, −)** to **Pin 14 (GND)**.
+3. Connect the LED's **short leg (cathode, −)** to the breadboard **− rail**.
 
 #### Active Buzzer
 1. Place the buzzer on the breadboard.
 2. Connect the buzzer's **(+) pin** to **Pin 15 (GPIO 22)**.
-3. Connect the buzzer's **(−) pin** to **Pin 9 (GND)**.
+3. Connect the buzzer's **(−) pin** to the breadboard **− rail**.
 
 #### DHT11 Temperature & Humidity Sensor
 1. The DHT11 module (from the Elegoo kit) has 3 pins labeled **+**, **out**, and **−**.
-2. Connect **+** (VCC) to **Pin 2 (5V)** using a red jumper wire (can share the breadboard rail with PIR VCC).
+2. Connect **+** (VCC) to the breadboard **+ rail**.
 3. Connect **out** (DATA) to **Pin 7 (GPIO 4)** using a yellow/green jumper wire.
-4. Connect **−** (GND) to **Pin 9 (GND)** using a black jumper wire.
+4. Connect **−** (GND) to the breadboard **− rail**.
 
 > The Elegoo DHT11 module has a built-in 10KΩ pull-up resistor — no extra resistor needed.
 

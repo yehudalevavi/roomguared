@@ -8,8 +8,12 @@ Build incrementally — one component at a time. Each phase adds one new hardwar
 
 ## Existing Setup (already working)
 
+All components share power via the **breadboard power rails** — one wire from RPi Pin 2 (5V) to the `+` rail, one from RPi Pin 6 (GND) to the `−` rail. Each component taps VCC/GND from these rails.
+
 | Component | GPIO (BCM) | Physical Pin |
 |-----------|-----------|-------------|
+| 5V Power Rail | — | Pin 2 → breadboard + rail |
+| GND Rail | — | Pin 6 → breadboard − rail |
 | PIR Sensor OUT | GPIO 17 | Pin 11 |
 | LED (+) | GPIO 27 | Pin 13 |
 | Buzzer (+) | GPIO 22 | Pin 15 |
@@ -20,13 +24,13 @@ Build incrementally — one component at a time. Each phase adds one new hardwar
 
 **Goal:** Read temperature and humidity, print to console.
 
-**New wiring (3 wires):**
+**New wiring (1 data wire — power from breadboard rails):**
 
 | Wire | From | To |
 |------|------|----|
-| VCC (red) | DHT11 `+` pin | RPi Pin 2 (5V) |
+| VCC (red) | DHT11 `+` pin | Breadboard + rail |
 | DATA (yellow) | DHT11 `out` pin | RPi Pin 7 (GPIO 4) |
-| GND (black) | DHT11 `-` pin | RPi Pin 9 (GND) |
+| GND (black) | DHT11 `-` pin | Breadboard − rail |
 
 > The DHT11 module on the Elegoo kit has a built-in pull-up resistor, so no extra resistor needed.
 
@@ -52,11 +56,11 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 | LCD Pin | LCD Label | Connect To | Notes |
 |---------|-----------|-----------|-------|
-| 1 | VSS | RPi Pin 6 (GND) | Ground |
-| 2 | VDD | RPi Pin 2 (5V) | Power |
+| 1 | VSS | Breadboard − rail | Ground |
+| 2 | VDD | Breadboard + rail | Power |
 | 3 | V0 | Potentiometer wiper | Contrast adjustment |
 | 4 | RS | RPi Pin 37 (GPIO 26) | Register Select |
-| 5 | RW | RPi Pin 6 (GND) | Ground = Write mode |
+| 5 | RW | Breadboard − rail | Ground = Write mode |
 | 6 | E | RPi Pin 35 (GPIO 19) | Enable |
 | 7 | D0 | — | Not connected |
 | 8 | D1 | — | Not connected |
@@ -66,15 +70,15 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | 12 | D5 | RPi Pin 31 (GPIO 6) | Data bit 5 |
 | 13 | D6 | RPi Pin 29 (GPIO 5) | Data bit 6 |
 | 14 | D7 | RPi Pin 23 (GPIO 11) | Data bit 7 |
-| 15 | A | RPi Pin 2 (5V) via 220Ω | Backlight + |
-| 16 | K | RPi Pin 6 (GND) | Backlight − |
+| 15 | A | Breadboard + rail via 220Ω | Backlight + |
+| 16 | K | Breadboard − rail | Backlight − |
 
 **Potentiometer wiring (for contrast):**
 
 | Potentiometer Pin | Connect To |
 |-------------------|-----------|
-| Left leg | RPi Pin 2 (5V) |
-| Right leg | RPi Pin 6 (GND) |
+| Left leg | Breadboard + rail |
+| Right leg | Breadboard − rail |
 | Middle leg (wiper) | LCD Pin 3 (V0) |
 
 > After powering on, slowly turn the potentiometer until you see solid rectangles on the LCD top row — that means contrast is correct.
@@ -117,12 +121,12 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 **Goal:** Get accurate timestamps even without internet.
 
-**New wiring (4 wires):**
+**New wiring (2 wires — power from breadboard rails):**
 
 | Wire | From | To |
 |------|------|----|
-| VCC (red) | DS1307 VCC | RPi Pin 1 (3.3V) |
-| GND (black) | DS1307 GND | RPi Pin 14 (GND) |
+| VCC (red) | DS1307 VCC | Breadboard + rail |
+| GND (black) | DS1307 GND | Breadboard − rail |
 | SDA (blue) | DS1307 SDA | RPi Pin 3 (GPIO 2 / SDA1) |
 | SCL (yellow) | DS1307 SCL | RPi Pin 5 (GPIO 3 / SCL1) |
 
@@ -231,6 +235,8 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 | Component | GPIO (BCM) | Physical Pin | Direction |
 |-----------|-----------|-------------|-----------|
+| 5V Power Rail | — | Pin 2 → breadboard + rail | POWER |
+| GND Rail | — | Pin 6 → breadboard − rail | GROUND |
 | PIR Sensor | GPIO 17 | Pin 11 | INPUT |
 | LED | GPIO 27 | Pin 13 | OUTPUT |
 | Buzzer (passive) | GPIO 22 | Pin 15 | PWM OUTPUT |
@@ -243,6 +249,8 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | LCD D7 | GPIO 11 | Pin 23 | OUTPUT |
 | RTC SDA | GPIO 2 | Pin 3 | I2C |
 | RTC SCL | GPIO 3 | Pin 5 | I2C |
+
+> All component VCC/GND pins connect to the breadboard power rails, not directly to RPi pins.
 
 ## New Dependencies
 
