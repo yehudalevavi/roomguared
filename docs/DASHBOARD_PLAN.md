@@ -46,7 +46,49 @@ All components share power via the **breadboard power rails** — one wire from 
 
 ---
 
-## Phase 2: LCD1602 Display (4-bit parallel mode)
+## Phase 2: Passive Buzzer with Melodies & Sound Cues
+
+**Goal:** Replace the active buzzer with the passive buzzer to play real melodies and distinct audio cues for different events.
+
+**Why:** The active buzzer can only make one tone (on/off). The passive buzzer can play any frequency, enabling recognizable melodies for the alarm and short sound cues for other system events.
+
+**New wiring (swap 1 component — same pin):**
+
+| Change | From | To |
+|--------|------|----|
+| Disconnect active buzzer from GPIO 22 | Active buzzer (+) | — |
+| Connect passive buzzer to GPIO 22 | Passive buzzer (+) | RPi Pin 15 (GPIO 22) |
+| Connect passive buzzer GND | Passive buzzer (−) | Breadboard − rail |
+
+> Same pin (GPIO 22), just swap the buzzer component. The passive buzzer is slightly larger and has **no** white sticker/marking on top (unlike the active buzzer which has one).
+
+**Software:**
+- Create `src/buzzer.py` — a reusable buzzer module with:
+  - `play_tone(frequency, duration)` — play a single tone using PWM
+  - `play_melody(notes)` — play a sequence of (frequency, duration) tuples
+  - Predefined melodies:
+    - `MELODY_ALARM` — urgent siren pattern for motion detection
+    - `MELODY_STARTUP` — friendly ascending jingle on boot
+    - `MELODY_ARM` — short confirmation beep when system starts watching
+    - `MELODY_DISARM` — descending tone when system stops (Ctrl+C / service stop)
+    - `MELODY_SENSOR_ERROR` — low double-beep when a sensor read fails
+- Create `src/test_buzzer.py` — hardware test that plays each melody in sequence
+- Create `tests/test_buzzer_unit.py` — unit tests for tone/melody logic
+- Update `room_guard.py` to use the new buzzer module:
+  - Motion detected → `MELODY_ALARM`
+  - Startup complete → `MELODY_STARTUP`
+  - Shutdown → `MELODY_DISARM`
+
+**Validation:**
+- ✅ Each melody plays distinctly and is easy to tell apart
+- ✅ Tones sound at correct pitch (not just clicking)
+- ✅ Motion alert melody is noticeably urgent vs. friendly startup jingle
+- ✅ Existing LED behavior is unaffected
+- ✅ Unit tests pass without hardware
+
+---
+
+## Phase 3: LCD1602 Display (4-bit parallel mode)
 
 **Goal:** Display text on the LCD screen.
 
@@ -96,11 +138,11 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 3: DHT11 + LCD Integration
+## Phase 4: DHT11 + LCD Integration
 
 **Goal:** Show live temperature and humidity on the LCD.
 
-**New wiring:** None — uses Phase 1 + Phase 2 wiring.
+**New wiring:** None — uses Phase 1 + Phase 3 wiring.
 
 **Software:**
 - Create `src/test_dht_lcd.py` — reads DHT11 and displays on LCD:
@@ -117,7 +159,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 4: DS1307 RTC Module (Real-Time Clock)
+## Phase 5: DS1307 RTC Module (Real-Time Clock)
 
 **Goal:** Get accurate timestamps even without internet.
 
@@ -144,7 +186,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 5: Smart Room Dashboard (Full Integration)
+## Phase 6: Smart Room Dashboard (Full Integration)
 
 **Goal:** Merge all components into an upgraded `room_guard.py`.
 
@@ -171,49 +213,6 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 - ✅ Motion events appear in `logs/events.csv` with correct timestamps
 - ✅ System runs stable for 10+ minutes
 - ✅ Service can be restarted and picks up cleanly
-
----
-
-## Phase 6: Passive Buzzer with Melodies & Sound Cues
-
-**Goal:** Replace the active buzzer with the passive buzzer to play real melodies and distinct audio cues for different events.
-
-**Why:** The active buzzer can only make one tone (on/off). The passive buzzer can play any frequency, enabling recognizable melodies for the alarm and short sound cues for other system events.
-
-**New wiring (swap 1 wire):**
-
-| Change | From | To |
-|--------|------|----|
-| Disconnect active buzzer from GPIO 22 | Active buzzer (+) | — |
-| Connect passive buzzer to GPIO 22 | Passive buzzer (+) | RPi Pin 15 (GPIO 22) |
-| Connect passive buzzer GND | Passive buzzer (−) | RPi Pin 9 (GND) |
-
-> Same pin (GPIO 22), just swap the buzzer component. The passive buzzer is slightly larger and has **no** white sticker/marking on top (unlike the active buzzer which has one).
-
-**Software:**
-- Create `src/buzzer.py` — a reusable buzzer module with:
-  - `play_tone(frequency, duration)` — play a single tone using PWM
-  - `play_melody(notes)` — play a sequence of (frequency, duration) tuples
-  - Predefined melodies:
-    - `MELODY_ALARM` — urgent siren pattern for motion detection
-    - `MELODY_STARTUP` — friendly ascending jingle on boot
-    - `MELODY_ARM` — short confirmation beep when system starts watching
-    - `MELODY_DISARM` — descending tone when system stops (Ctrl+C / service stop)
-    - `MELODY_SENSOR_ERROR` — low double-beep when a sensor read fails
-- Create `src/test_buzzer.py` — hardware test that plays each melody in sequence
-- Create `tests/test_buzzer_unit.py` — unit tests for tone/melody logic
-- Update `room_guard.py` to use the new buzzer module:
-  - Motion detected → `MELODY_ALARM`
-  - Startup complete → `MELODY_STARTUP`
-  - Shutdown → `MELODY_DISARM`
-  - DHT11/RTC read failure → `MELODY_SENSOR_ERROR` (if dashboard is integrated)
-
-**Validation:**
-- ✅ Each melody plays distinctly and is easy to tell apart
-- ✅ Tones sound at correct pitch (not just clicking)
-- ✅ Motion alert melody is noticeably urgent vs. friendly startup jingle
-- ✅ Existing LED behavior is unaffected
-- ✅ Unit tests pass without hardware
 
 ---
 
