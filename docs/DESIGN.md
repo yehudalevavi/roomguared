@@ -40,7 +40,7 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 | 4 | HC-SR501 PIR sensor    | 1   | ~$2         | 3-pin: VCC, OUT, GND                   |
 | 5 | LED (any color)        | 1   | ~$0.10      | Standard 5mm through-hole              |
 | 6 | 220Ω resistor          | 1   | ~$0.05      | ¼W, for LED current limiting           |
-| 7 | Active buzzer          | 1   | ~$1         | 3V–5V operating voltage                |
+| 7 | Passive buzzer         | 1   | ~$1         | 3V–5V, **no** white sticker on top (unlike active buzzer) |
 | 8 | Breadboard             | 1   | ~$3         | Half-size or full-size                  |
 | 9 | Jumper wires (Male-to-Female) | ~10 | ~$2  | For connecting RPi GPIO to breadboard  |
 
@@ -152,7 +152,7 @@ All components then tap power and ground from these rails. This keeps wiring cle
 | GND Rail         | —         | Pin 6 (GND) | GROUND    |
 | PIR Sensor OUT   | GPIO 17   | Pin 11      | INPUT     |
 | LED (+) via 220Ω | GPIO 27   | Pin 13      | OUTPUT    |
-| Buzzer (+)       | GPIO 22   | Pin 15      | OUTPUT    |
+| Buzzer (+)       | GPIO 22   | Pin 15      | PWM OUTPUT |
 | DHT11 DATA       | GPIO 4    | Pin 7       | INPUT     |
 
 > All component VCC pins connect to the breadboard **+ rail**, and all GND pins to the **− rail**.
@@ -214,8 +214,9 @@ All components then tap power and ground from these rails. This keeps wiring cle
 2. Connect a **220Ω resistor** from **Pin 13 (GPIO 27)** to the LED's **long leg (anode, +)**.
 3. Connect the LED's **short leg (cathode, −)** to the breadboard **− rail**.
 
-#### Active Buzzer
-1. Place the buzzer on the breadboard.
+#### Passive Buzzer
+1. Place the passive buzzer on the breadboard.
+   > The passive buzzer is slightly larger than the active one and has **no** white sticker/marking on top.
 2. Connect the buzzer's **(+) pin** to **Pin 15 (GPIO 22)**.
 3. Connect the buzzer's **(−) pin** to the breadboard **− rail**.
 
@@ -285,29 +286,15 @@ pip3 install -r requirements.txt
 
 ### Test the outputs
 
-Before running the full application, verify that the LED and buzzer are wired correctly:
+Before running the full application, verify that the LED and passive buzzer are wired correctly:
 
 ```bash
 source .venv/bin/activate
-python3 src/test_outputs.py
+python3 src/test_outputs.py   # LED on/off test
+python3 src/test_buzzer.py    # Passive buzzer melody test
 ```
 
-You should see:
-
-```
-=== Output Test ===
-
-1) LED on for 2 seconds...
-   LED off.
-
-2) Buzzer on for 1 second...
-   Buzzer off.
-
-3) Both on together for 2 seconds...
-   Both off.
-
-=== Test complete ===
-```
+The buzzer test plays 5 distinct melodies (startup, arm, alarm, sensor error, disarm). If you hear clicking instead of tones, you may have the active buzzer connected — swap it for the passive one.
 
 If the LED doesn't light up or the buzzer doesn't sound, check the [Troubleshooting](#troubleshooting) section.
 
@@ -376,22 +363,28 @@ sudo systemctl stop room_guard
 │   HC-SR501      │  RISING │                  │  HIGH   │   LED     │
 │   PIR Sensor    │────────▶│   room_guard.py  │────────▶│  GPIO 27  │
 │   (GPIO 17)     │  EDGE   │                  │         └───────────┘
-└─────────────────┘         │  1. Detect       │         ┌───────────┐
-                            │  2. Alert ON     │  HIGH   │  Buzzer   │
-                            │  3. Wait cooldown│────────▶│  GPIO 22  │
-                            │  4. Alert OFF    │         └───────────┘
-                            │  5. Log event    │
+└─────────────────┘         │  1. Startup ♪    │         ┌───────────┐
+                            │  2. Detect       │   PWM   │  Passive  │
+                            │  3. Alarm ♪ + LED│────────▶│  Buzzer   │
+                            │  4. Cooldown     │         │  GPIO 22  │
+                            │  5. Log event    │         └───────────┘
+                            │  6. Disarm ♪     │
                             └──────────────────┘
+                                    │
+                            ┌───────┘
+                            ▼
+                      src/buzzer.py
+                      (PWM melodies)
 ```
 
 ### How it works
 
-1. **Initialization**: Set up GPIO devices using `gpiozero` (MotionSensor for PIR, LED and OutputDevice for outputs). Register a motion callback on the PIR sensor.
+1. **Initialization**: Set up GPIO devices using `gpiozero` (MotionSensor for PIR, LED for the light, PWMOutputDevice for the passive buzzer via `src/buzzer.py`). Play the startup jingle. Register a motion callback on the PIR sensor.
 2. **Waiting**: The main thread sleeps while `gpiozero` watches for motion on GPIO 17.
-3. **Motion detected**: The callback fires — LED and buzzer are turned ON. A timestamp is logged.
-4. **Cooldown**: After the configured cooldown period (default 5s), LED and buzzer are turned OFF.
-5. **Repeat**: System returns to waiting state.
-6. **Shutdown**: On SIGINT (Ctrl+C) or SIGTERM (systemd stop), all GPIO pins are cleaned up.
+3. **Motion detected**: The callback fires — LED turns on, the alarm melody plays via PWM. A timestamp is logged.
+4. **Cooldown**: After the configured cooldown period (default 10s), the system returns to waiting.
+5. **Repeat**: System is ready to detect again.
+6. **Shutdown**: On SIGINT (Ctrl+C) or SIGTERM (systemd stop), the disarm melody plays, then all GPIO pins are cleaned up.
 
 ---
 
@@ -440,7 +433,8 @@ ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
 | PIR sensor always HIGH | Wait 30–60s after powering on (calibration period). Adjust sensitivity pot. |
 | PIR sensor never triggers | Check wiring (VCC to 5V, not 3.3V). Try adjusting sensitivity clockwise. |
 | LED doesn't light | Check polarity (long leg = +). Verify resistor connection. |
-| Buzzer doesn't sound | Check polarity (+ to GPIO). Some buzzers have a tiny sticker on top — remove it. |
+| Buzzer doesn't sound | Check polarity (+ to GPIO). Ensure you have the **passive** buzzer (no white sticker on top). |
+| Buzzer clicks instead of tones | You may have the **active** buzzer connected. Swap it for the passive one. |
 | `Permission denied` on GPIO | Run `sudo usermod -aG gpio $USER` and re-login. Or run with `sudo`. |
 | `lgpio` import error in venv | Recreate venv with `python3 -m venv --system-site-packages .venv` |
 | DHT11 reads all fail | Check DATA wire is on Pin 7 (GPIO 4). Ensure VCC is on 5V. Install `libgpiod2`: `sudo apt install -y libgpiod2` |

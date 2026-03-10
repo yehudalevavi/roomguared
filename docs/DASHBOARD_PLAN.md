@@ -22,6 +22,10 @@ All components share power via the **breadboard power rails** — one wire from 
 
 ## Phase 1: DHT11 Temperature & Humidity Sensor
 
+**Status: ⏸️ Code-complete — waiting for hardware**
+
+> The sensor module and unit tests are implemented and committed. When you have the physical DHT11 sensor, complete the remaining steps below.
+
 **Goal:** Read temperature and humidity, print to console.
 
 **New wiring (1 data wire — power from breadboard rails):**
@@ -34,10 +38,17 @@ All components share power via the **breadboard power rails** — one wire from 
 
 > The DHT11 module on the Elegoo kit has a built-in pull-up resistor, so no extra resistor needed.
 
-**Software:**
+**Software (done ✅):**
 - Install `adafruit-circuitpython-dht` library
-- Create `src/test_dht11.py` — reads and prints temperature (°C) and humidity (%) every 2 seconds
-- Run for 10 readings, then exit
+- `src/dht11_sensor.py` — sensor module with retry logic and value validation
+- `src/test_dht11.py` — hardware test that takes 10 readings
+- `tests/test_dht11_unit.py` — unit tests (pass without hardware)
+
+**When the sensor arrives — remaining steps:**
+1. **Wire** the DHT11 to the breadboard using the table above (power off the Pi first!)
+2. **Test** hardware: `source .venv/bin/activate && python3 src/test_dht11.py` — expect ≥8/10 successful reads
+3. **Integrate** the sensor into `room_guard.py` — import `DHT11Sensor`, read on each motion event, and include temperature/humidity in the log output
+4. **Validate** that the Room Guard still works end-to-end with the sensor added
 
 **Validation:**
 - ✅ Temperature shows a reasonable value (15–35°C indoors)
