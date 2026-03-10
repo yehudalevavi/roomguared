@@ -20,6 +20,7 @@ NOTE_C4 = 261.63
 NOTE_D4 = 293.66
 NOTE_E4 = 329.63
 NOTE_F4 = 349.23
+NOTE_FS4 = 369.99  # F#4
 NOTE_G4 = 392.00
 NOTE_A4 = 440.00
 NOTE_B4 = 493.88
@@ -37,20 +38,17 @@ REST = 0  # silence
 # REST (0 Hz) entries create silent gaps between notes.
 
 MELODY_ALARM = [
-    # Urgent two-tone siren pattern (like a European emergency siren)
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (REST, 0.10),
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (NOTE_A5, 0.15), (NOTE_E5, 0.15),
-    (REST, 0.10),
-    # Accelerating finish
-    (NOTE_A5, 0.10), (NOTE_E5, 0.10),
-    (NOTE_A5, 0.08), (NOTE_E5, 0.08),
-    (NOTE_A5, 0.06), (NOTE_E5, 0.06),
-    (NOTE_A5, 0.80),
+    # Mozart — Eine kleine Nachtmusik, opening motif (K. 525)
+    # First phrase: G-D, G-B-D arpeggio up
+    (NOTE_G4, 0.28), (REST, 0.04),
+    (NOTE_D4, 0.14), (REST, 0.04),
+    (NOTE_G4, 0.11), (NOTE_B4, 0.11), (NOTE_D5, 0.11),
+    (NOTE_D5, 0.32), (REST, 0.08),
+    # Second phrase: D-A, F#-A-D arpeggio up
+    (NOTE_D5, 0.28), (REST, 0.04),
+    (NOTE_A4, 0.14), (REST, 0.04),
+    (NOTE_FS4, 0.11), (NOTE_A4, 0.11), (NOTE_D5, 0.11),
+    (NOTE_D5, 0.32),
 ]
 
 MELODY_STARTUP = [
