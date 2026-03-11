@@ -105,7 +105,80 @@ All components share power via the **breadboard power rails** — one wire from 
 
 ---
 
-## Phase 3: LCD1602 Display (4-bit parallel mode)
+## Phase 3: Web-Based Control Panel
+
+**Goal:** Create a lightweight web UI served from the Pi to control the Room Guard from any device on the local network (phone, laptop, etc.) at `http://room-guard:5000`.
+
+**Why:** Right now, controlling the Room Guard requires SSH access and command-line skills. A simple web dashboard lets anyone in the family start/stop the sensor, play melodies, and toggle the LED — all from a browser.
+
+**New wiring:** None — software only.
+
+**Dependencies:** `flask` (added to `requirements.txt`)
+
+**Software:**
+- Create `src/web_app.py` — Flask application with a simple responsive HTML UI:
+  - **Motion Sensor**: Start / Stop / Status indicator (watching / paused / cooldown)
+  - **Buzzer**: Play any of the 20 melodies on demand (dropdown + play button), stop playback
+  - **LED**: Toggle on / off
+  - **System**: Show uptime, last motion event time, total motion count
+  - **Logs**: Show recent motion events with melody names (scrollable, auto-refresh)
+- Refactor `room_guard.py` to expose control functions:
+  - `arm()` / `disarm()` — enable/disable PIR motion detection
+  - `play_melody_by_name(name)` — play a specific melody
+  - `set_led(on: bool)` — manual LED control
+  - `get_status()` — return current state (armed/disarmed, motion count, last event, etc.)
+- Create `src/templates/index.html` — single-page responsive dashboard
+  - Mobile-friendly (works on phone browsers)
+  - Auto-refreshes status every few seconds via AJAX
+  - No external CDN dependencies (works offline on local network)
+- Create `tests/test_web_unit.py` — unit tests for Flask routes (mocked hardware)
+- Update `config/room_guard.service` to run the Flask app (or run both together)
+
+**Architecture:**
+```
+Browser (phone/laptop)          Raspberry Pi
+┌──────────────┐     HTTP      ┌──────────────────────┐
+│  Dashboard   │◄────────────► │  Flask (port 5000)   │
+│  index.html  │   local net   │        │              │
+└──────────────┘               │  room_guard module   │
+                               │   ├── PIR sensor     │
+                               │   ├── LED            │
+                               │   ├── Buzzer         │
+                               │   └── Melody library │
+                               └──────────────────────┘
+```
+
+**API Endpoints (planned):**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Dashboard HTML page |
+| GET | `/api/status` | JSON: armed, motion count, last event, LED state |
+| POST | `/api/arm` | Enable motion detection |
+| POST | `/api/disarm` | Disable motion detection |
+| POST | `/api/led/on` | Turn LED on |
+| POST | `/api/led/off` | Turn LED off |
+| POST | `/api/play/<name>` | Play a specific melody by name |
+| GET | `/api/melodies` | List all available melody names |
+| GET | `/api/logs` | Recent motion events (JSON) |
+
+**Validation:**
+- ✅ Dashboard loads on `http://room-guard:5000` from phone and laptop
+- ✅ Start/stop motion detection works from the UI
+- ✅ LED toggle responds immediately
+- ✅ Melody plays on demand when selected from the list
+- ✅ Status auto-refreshes (armed state, motion count, last event)
+- ✅ Service runs correctly via systemd
+- ✅ Unit tests pass without hardware
+
+**Future extensions (Phase 3+):**
+- Add temperature/humidity display when DHT11 sensor is available
+- Add LCD control (send custom text to the display)
+- Add system controls (reboot Pi, view system info)
+
+---
+
+## Phase 4: LCD1602 Display (4-bit parallel mode)
 
 **Goal:** Display text on the LCD screen.
 
@@ -155,11 +228,11 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 4: DHT11 + LCD Integration
+## Phase 5: DHT11 + LCD Integration
 
 **Goal:** Show live temperature and humidity on the LCD.
 
-**New wiring:** None — uses Phase 1 + Phase 3 wiring.
+**New wiring:** None — uses Phase 1 + Phase 4 wiring.
 
 **Software:**
 - Create `src/test_dht_lcd.py` — reads DHT11 and displays on LCD:
@@ -176,7 +249,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 5: DS1307 RTC Module (Real-Time Clock)
+## Phase 6: DS1307 RTC Module (Real-Time Clock)
 
 **Goal:** Get accurate timestamps even without internet.
 
@@ -203,7 +276,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 6: Smart Room Dashboard (Full Integration)
+## Phase 7: Smart Room Dashboard (Full Integration)
 
 **Goal:** Merge all components into an upgraded `room_guard.py`.
 
@@ -233,7 +306,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 7 (Optional/Bonus): Photoresistor Light Level
+## Phase 8 (Optional/Bonus): Photoresistor Light Level
 
 **Goal:** Add light level sensing to the dashboard.
 
