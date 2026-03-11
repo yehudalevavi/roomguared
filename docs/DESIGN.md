@@ -294,7 +294,7 @@ python3 src/test_outputs.py   # LED on/off test
 python3 src/test_buzzer.py    # Passive buzzer melody test
 ```
 
-The buzzer test plays 5 distinct melodies (startup, arm, alarm, sensor error, disarm). If you hear clicking instead of tones, you may have the active buzzer connected — swap it for the passive one.
+The buzzer test plays 4 system melodies (startup, arm, sensor error, disarm) plus 3 random samples from the 20-melody motion library. If you hear clicking instead of tones, you may have the active buzzer connected — swap it for the passive one.
 
 If the LED doesn't light up or the buzzer doesn't sound, check the [Troubleshooting](#troubleshooting) section.
 
@@ -311,17 +311,20 @@ You should see:
 [Room Guard] Starting up...
 [Room Guard] PIR sensor on GPIO 17
 [Room Guard] LED on GPIO 27
-[Room Guard] Buzzer on GPIO 22
+[Room Guard] Passive buzzer on GPIO 22
+[Room Guard] 20 melodies loaded, 10s cooldown
 [Room Guard] Waiting for motion...
 ```
 
 Wave your hand in front of the PIR sensor. You should see:
 
 ```
-[Room Guard] 2026-03-04 14:30:05 — MOTION DETECTED!
+[Room Guard] 2026-03-11 09:30:05 — MOTION DETECTED! Playing: Eine kleine Nachtmusik
 ```
 
-Press **Ctrl+C** to stop.
+Each detection plays a different random melody from the library of 20 famous tunes.
+
+Press **Ctrl+C** to stop (plays a descending disarm melody).
 
 ---
 
@@ -381,9 +384,9 @@ sudo systemctl stop room_guard
 
 1. **Initialization**: Set up GPIO devices using `gpiozero` (MotionSensor for PIR, LED for the light, PWMOutputDevice for the passive buzzer via `src/buzzer.py`). Play the startup jingle. Register a motion callback on the PIR sensor.
 2. **Waiting**: The main thread sleeps while `gpiozero` watches for motion on GPIO 17.
-3. **Motion detected**: The callback fires — LED turns on, the alarm melody plays via PWM. A timestamp is logged.
+3. **Motion detected**: The callback fires — a random melody is selected from the 20-melody library (`src/melody_library.py`). The LED turns on, the melody plays via PWM, and the melody name is logged.
 4. **Cooldown**: After the configured cooldown period (default 10s), the system returns to waiting.
-5. **Repeat**: System is ready to detect again.
+5. **Repeat**: System is ready to detect again. Each detection plays a different random melody.
 6. **Shutdown**: On SIGINT (Ctrl+C) or SIGTERM (systemd stop), the disarm melody plays, then all GPIO pins are cleaned up.
 
 ---

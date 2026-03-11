@@ -59,6 +59,8 @@ All components share power via the **breadboard power rails** — one wire from 
 
 ## Phase 2: Passive Buzzer with Melodies & Sound Cues
 
+**Status: ✅ Complete**
+
 **Goal:** Replace the active buzzer with the passive buzzer to play real melodies and distinct audio cues for different events.
 
 **Why:** The active buzzer can only make one tone (on/off). The passive buzzer can play any frequency, enabling recognizable melodies for the alarm and short sound cues for other system events.
@@ -73,29 +75,33 @@ All components share power via the **breadboard power rails** — one wire from 
 
 > Same pin (GPIO 22), just swap the buzzer component. The passive buzzer is slightly larger and has **no** white sticker/marking on top (unlike the active buzzer which has one).
 
-**Software:**
-- Create `src/buzzer.py` — a reusable buzzer module with:
+**Software (done ✅):**
+- `src/buzzer.py` — reusable buzzer module with:
   - `play_tone(frequency, duration)` — play a single tone using PWM
   - `play_melody(notes)` — play a sequence of (frequency, duration) tuples
-  - Predefined melodies:
-    - `MELODY_ALARM` — urgent siren pattern for motion detection
-    - `MELODY_STARTUP` — friendly ascending jingle on boot
-    - `MELODY_ARM` — short confirmation beep when system starts watching
-    - `MELODY_DISARM` — descending tone when system stops (Ctrl+C / service stop)
-    - `MELODY_SENSOR_ERROR` — low double-beep when a sensor read fails
-- Create `src/test_buzzer.py` — hardware test that plays each melody in sequence
-- Create `tests/test_buzzer_unit.py` — unit tests for tone/melody logic
-- Update `room_guard.py` to use the new buzzer module:
-  - Motion detected → `MELODY_ALARM`
-  - Startup complete → `MELODY_STARTUP`
-  - Shutdown → `MELODY_DISARM`
+  - Full chromatic scale constants (octaves 4-5)
+  - System melodies: `MELODY_STARTUP`, `MELODY_ARM`, `MELODY_DISARM`, `MELODY_SENSOR_ERROR`
+- `src/melody_library.py` — library of **20 famous public-domain melodies** for motion alerts:
+  - Twinkle Twinkle Little Star, Ode to Joy, Eine kleine Nachtmusik,
+    Für Elise, Happy Birthday, Jingle Bells, Mary Had a Little Lamb,
+    London Bridge, Frère Jacques, Beethoven's Fifth, Canon in D,
+    Brahms' Lullaby, William Tell Overture, La Cucaracha,
+    When the Saints Go Marching In, Row Row Row Your Boat,
+    Yankee Doodle, Oh! Susanna, Greensleeves, Old MacDonald
+  - `get_random_melody()` — returns a random (name, notes) tuple
+- `src/test_buzzer.py` — hardware test that plays system melodies + 3 random samples
+- `tests/test_buzzer_unit.py` — 32 unit tests for tone/melody logic + library validation
+- Updated `room_guard.py`:
+  - Motion detected → random melody from library (name logged)
+  - Startup → `MELODY_STARTUP` jingle
+  - Shutdown → `MELODY_DISARM` sign-off
 
 **Validation:**
-- ✅ Each melody plays distinctly and is easy to tell apart
+- ✅ Each melody plays distinctly and is recognizable
 - ✅ Tones sound at correct pitch (not just clicking)
-- ✅ Motion alert melody is noticeably urgent vs. friendly startup jingle
+- ✅ Motion alert plays a random melody each time, logged by name
 - ✅ Existing LED behavior is unaffected
-- ✅ Unit tests pass without hardware
+- ✅ 32 unit tests pass without hardware
 
 ---
 
