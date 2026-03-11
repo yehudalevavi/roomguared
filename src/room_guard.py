@@ -18,7 +18,7 @@ except ImportError:
     print("[Room Guard] Install with: pip3 install gpiozero lgpio")
     sys.exit(1)
 
-from buzzer import Buzzer, MELODY_STARTUP, MELODY_DISARM, melody_duration
+from buzzer import Buzzer, MELODY_STARTUP, MELODY_DISARM
 from melody_library import get_random_melody
 
 # --- Configuration ---
@@ -78,8 +78,7 @@ def main() -> None:
     print(f"[Room Guard] PIR sensor on GPIO {PIR_PIN}")
     print(f"[Room Guard] LED on GPIO {LED_PIN}")
     print(f"[Room Guard] Passive buzzer on GPIO {buzzer_dev.pin}")
-    alarm_dur = melody_duration(MELODY_ALARM)
-    print(f"[Room Guard] Alert: ~{alarm_dur:.1f}s melody, {COOLDOWN}s cooldown")
+    print(f"[Room Guard] 20 melodies loaded, {COOLDOWN}s cooldown")
     print("[Room Guard] Waiting for motion...")
     print()
 
