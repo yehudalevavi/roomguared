@@ -18,7 +18,8 @@ except ImportError:
     print("[Room Guard] Install with: pip3 install gpiozero lgpio")
     sys.exit(1)
 
-from buzzer import Buzzer, MELODY_ALARM, MELODY_STARTUP, MELODY_DISARM, melody_duration
+from buzzer import Buzzer, MELODY_STARTUP, MELODY_DISARM, melody_duration
+from melody_library import get_random_melody
 
 # --- Configuration ---
 PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
@@ -50,9 +51,10 @@ def shutdown(signum: int = None, frame=None) -> None:
 
 def motion_detected(sensor: MotionSensor) -> None:
     """Callback triggered when PIR sensor detects motion."""
-    log("MOTION DETECTED!")
+    name, melody = get_random_melody()
+    log(f"MOTION DETECTED! Playing: {name}")
     led.on()
-    buzzer_dev.play_melody(MELODY_ALARM)
+    buzzer_dev.play_melody(melody)
     led.off()
     log(f"Cooldown {COOLDOWN}s...")
     time.sleep(COOLDOWN)

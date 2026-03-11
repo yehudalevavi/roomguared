@@ -23,13 +23,13 @@ from buzzer import (
     NOTE_A4,
     NOTE_C5,
     NOTE_E5,
-    MELODY_ALARM,
     MELODY_STARTUP,
     MELODY_ARM,
     MELODY_DISARM,
     MELODY_SENSOR_ERROR,
     melody_duration,
 )
+from melody_library import MOTION_MELODIES, get_random_melody
 
 
 class TestBuzzerInit(unittest.TestCase):
@@ -202,7 +202,7 @@ class TestMelodyDuration(unittest.TestCase):
 
 
 class TestPredefinedMelodies(unittest.TestCase):
-    """Validate that all predefined melodies are well-formed."""
+    """Validate that all predefined system melodies are well-formed."""
 
     def _validate_melody(self, melody, name):
         self.assertIsInstance(melody, list, f"{name} should be a list")
@@ -216,9 +216,6 @@ class TestPredefinedMelodies(unittest.TestCase):
             self.assertGreaterEqual(freq, 0, f"{name}[{i}] frequency should be >= 0")
             self.assertGreater(dur, 0, f"{name}[{i}] duration should be > 0")
 
-    def test_alarm_melody(self):
-        self._validate_melody(MELODY_ALARM, "MELODY_ALARM")
-
     def test_startup_melody(self):
         self._validate_melody(MELODY_STARTUP, "MELODY_STARTUP")
 
@@ -231,17 +228,57 @@ class TestPredefinedMelodies(unittest.TestCase):
     def test_sensor_error_melody(self):
         self._validate_melody(MELODY_SENSOR_ERROR, "MELODY_SENSOR_ERROR")
 
-    def test_alarm_is_longest(self):
-        """The alarm melody should be noticeably longer than others."""
-        alarm_dur = melody_duration(MELODY_ALARM)
-        startup_dur = melody_duration(MELODY_STARTUP)
-        arm_dur = melody_duration(MELODY_ARM)
-        self.assertGreater(alarm_dur, startup_dur)
-        self.assertGreater(alarm_dur, arm_dur)
-
     def test_arm_is_short(self):
         """The arm confirmation should be short and snappy."""
         self.assertLess(melody_duration(MELODY_ARM), 0.5)
+
+
+class TestMotionMelodyLibrary(unittest.TestCase):
+    """Validate the 20-melody motion library."""
+
+    def _validate_melody(self, melody, name):
+        self.assertIsInstance(melody, list, f"{name} should be a list")
+        self.assertGreater(len(melody), 0, f"{name} should not be empty")
+        for i, note in enumerate(melody):
+            self.assertIsInstance(note, tuple, f"{name}[{i}] should be a tuple")
+            self.assertEqual(len(note), 2, f"{name}[{i}] should have 2 elements")
+            freq, dur = note
+            self.assertIsInstance(freq, (int, float), f"{name}[{i}] freq should be numeric")
+            self.assertIsInstance(dur, (int, float), f"{name}[{i}] dur should be numeric")
+            self.assertGreaterEqual(freq, 0, f"{name}[{i}] freq should be >= 0")
+            self.assertGreater(dur, 0, f"{name}[{i}] dur should be > 0")
+
+    def test_library_has_20_melodies(self):
+        self.assertEqual(len(MOTION_MELODIES), 20)
+
+    def test_all_melodies_have_name_and_notes(self):
+        for i, entry in enumerate(MOTION_MELODIES):
+            self.assertIsInstance(entry, tuple, f"entry {i} should be a tuple")
+            self.assertEqual(len(entry), 2, f"entry {i} should have (name, notes)")
+            name, notes = entry
+            self.assertIsInstance(name, str, f"entry {i} name should be str")
+            self.assertGreater(len(name), 0, f"entry {i} name should not be empty")
+
+    def test_all_melodies_are_well_formed(self):
+        for name, notes in MOTION_MELODIES:
+            self._validate_melody(notes, name)
+
+    def test_all_names_are_unique(self):
+        names = [name for name, _ in MOTION_MELODIES]
+        self.assertEqual(len(names), len(set(names)), "melody names should be unique")
+
+    def test_melodies_are_reasonable_length(self):
+        """Each melody should be between 1 and 6 seconds."""
+        for name, notes in MOTION_MELODIES:
+            dur = melody_duration(notes)
+            self.assertGreater(dur, 1.0, f"{name} is too short ({dur:.1f}s)")
+            self.assertLess(dur, 6.0, f"{name} is too long ({dur:.1f}s)")
+
+    def test_get_random_melody_returns_valid(self):
+        name, notes = get_random_melody()
+        self.assertIsInstance(name, str)
+        self.assertIsInstance(notes, list)
+        self.assertGreater(len(notes), 0)
 
 
 if __name__ == "__main__":

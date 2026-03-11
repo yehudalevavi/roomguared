@@ -15,41 +15,36 @@ import time
 
 BUZZER_PIN = 22  # GPIO 22 (Physical pin 15) — same pin as the old active buzzer
 
-# Standard musical note frequencies (Hz)
+# Standard musical note frequencies (Hz) — chromatic scale, octaves 4-5
 NOTE_C4 = 261.63
+NOTE_CS4 = 277.18  # C#4 / Db4
 NOTE_D4 = 293.66
+NOTE_DS4 = 311.13  # D#4 / Eb4
 NOTE_E4 = 329.63
 NOTE_F4 = 349.23
 NOTE_FS4 = 369.99  # F#4
 NOTE_G4 = 392.00
+NOTE_GS4 = 415.30  # G#4 / Ab4
 NOTE_A4 = 440.00
+NOTE_AS4 = 466.16  # A#4 / Bb4
 NOTE_B4 = 493.88
 NOTE_C5 = 523.25
+NOTE_CS5 = 554.37  # C#5 / Db5
 NOTE_D5 = 587.33
+NOTE_DS5 = 622.25  # D#5 / Eb5
 NOTE_E5 = 659.25
 NOTE_F5 = 698.46
+NOTE_FS5 = 739.99  # F#5
 NOTE_G5 = 783.99
+NOTE_GS5 = 830.61  # G#5 / Ab5
 NOTE_A5 = 880.00
+NOTE_AS5 = 932.33  # A#5 / Bb5
 NOTE_B5 = 987.77
 NOTE_C6 = 1046.50
 REST = 0  # silence
 
-# Predefined melodies: list of (frequency_hz, duration_seconds) tuples
+# System melodies: list of (frequency_hz, duration_seconds) tuples
 # REST (0 Hz) entries create silent gaps between notes.
-
-MELODY_ALARM = [
-    # Mozart — Eine kleine Nachtmusik, opening motif (K. 525)
-    # First phrase: G-D, G-B-D arpeggio up
-    (NOTE_G4, 0.28), (REST, 0.04),
-    (NOTE_D4, 0.14), (REST, 0.04),
-    (NOTE_G4, 0.11), (NOTE_B4, 0.11), (NOTE_D5, 0.11),
-    (NOTE_D5, 0.32), (REST, 0.08),
-    # Second phrase: D-A, F#-A-D arpeggio up
-    (NOTE_D5, 0.28), (REST, 0.04),
-    (NOTE_A4, 0.14), (REST, 0.04),
-    (NOTE_FS4, 0.11), (NOTE_A4, 0.11), (NOTE_D5, 0.11),
-    (NOTE_D5, 0.32),
-]
 
 MELODY_STARTUP = [
     # Friendly ascending jingle
