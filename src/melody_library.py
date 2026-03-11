@@ -42,16 +42,22 @@ MOTION_MELODIES = [
     ),
     (
         "Eine kleine Nachtmusik",
-        # Mozart K.525 — G major, opening motif
+        # Mozart K.525, 1st mvt Allegro — G major, opening 4 bars
+        # Verified from MIDI score, transposed down one octave for buzzer
+        # q=0.30s, e=0.15s at ~200 BPM
         [
-            (NOTE_G4, 0.28), (REST, 0.04),
-            (NOTE_D4, 0.14), (REST, 0.04),
-            (NOTE_G4, 0.11), (NOTE_B4, 0.11), (NOTE_D5, 0.11),
-            (NOTE_D5, 0.32), (REST, 0.08),
-            (NOTE_D5, 0.28), (REST, 0.04),
-            (NOTE_A4, 0.14), (REST, 0.04),
-            (NOTE_FS4, 0.11), (NOTE_A4, 0.11), (NOTE_D5, 0.11),
-            (NOTE_D5, 0.32),
+            # Bar 1: G(q) r(e) D(e) | G(q) r(e) D(e)
+            (NOTE_G4, 0.30), (REST, 0.15), (NOTE_D4, 0.15),
+            (NOTE_G4, 0.30), (REST, 0.15), (NOTE_D4, 0.15),
+            # Bar 2: G(e) D(e) G(e) B(e) | D5(q) r(q)
+            (NOTE_G4, 0.15), (NOTE_D4, 0.15), (NOTE_G4, 0.15), (NOTE_B4, 0.15),
+            (NOTE_D5, 0.30), (REST, 0.30),
+            # Bar 3: C5(q) r(e) A(e) | C5(q) r(e) A(e)
+            (NOTE_C5, 0.30), (REST, 0.15), (NOTE_A4, 0.15),
+            (NOTE_C5, 0.30), (REST, 0.15), (NOTE_A4, 0.15),
+            # Bar 4: C5(e) A(e) F#(e) A(e) | D(q) r(q)
+            (NOTE_C5, 0.15), (NOTE_A4, 0.15), (NOTE_FS4, 0.15), (NOTE_A4, 0.15),
+            (NOTE_D4, 0.30), (REST, 0.30),
         ],
     ),
     (
