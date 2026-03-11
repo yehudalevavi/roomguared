@@ -1,102 +1,288 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🛡️ Room Guard</title>
+<title>🛡️ שומר החדר</title>
 <style>
-  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --green: #4ecca3; --red: #e84545; --yellow: #f5c542; --text: #eee; --muted: #999; }
+  :root {
+    --bg: #1b1b3a;
+    --card: #2a2a5a;
+    --card-hover: #33336a;
+    --green: #2ecc71;
+    --green-glow: rgba(46,204,113,0.3);
+    --red: #ff6b6b;
+    --red-glow: rgba(255,107,107,0.3);
+    --yellow: #ffd93d;
+    --yellow-glow: rgba(255,217,61,0.3);
+    --blue: #6c5ce7;
+    --blue-glow: rgba(108,92,231,0.3);
+    --purple: #a29bfe;
+    --pink: #fd79a8;
+    --orange: #fdcb6e;
+    --text: #fff;
+    --muted: #b0b0d0;
+    --card-border: rgba(255,255,255,0.08);
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; }
-  h1 { text-align: center; margin-bottom: 16px; font-size: 1.5rem; }
-  .card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-  .card h2 { font-size: 1rem; margin-bottom: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-  .badge-green { background: var(--green); color: #000; }
-  .badge-red { background: var(--red); color: #fff; }
-  .badge-yellow { background: var(--yellow); color: #000; }
-  .badge-muted { background: #333; color: var(--muted); }
-  .btn { border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; width: 100%; margin-top: 6px; }
-  .btn:hover { opacity: 0.85; }
-  .btn:active { opacity: 0.7; }
-  .btn-green { background: var(--green); color: #000; }
-  .btn-red { background: var(--red); color: #fff; }
-  .btn-accent { background: var(--accent); color: var(--text); }
-  .btn-muted { background: #333; color: var(--muted); }
-  select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: var(--text); font-size: 0.95rem; margin-bottom: 6px; }
-  .logs { max-height: 250px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.5; color: var(--muted); }
-  .logs .entry { padding: 2px 0; border-bottom: 1px solid #222; }
-  .logs .time { color: #666; }
-  .logs .motion { color: var(--yellow); }
-  .stat { font-size: 1.4rem; font-weight: 700; }
-  .stat-label { font-size: 0.8rem; color: var(--muted); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1b1b3a 0%, #2d1b69 50%, #1b1b3a 100%);
+    color: var(--text);
+    padding: 12px;
+    max-width: 500px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 16px; position: relative; }
+  .header .mascot { font-size: 3.5rem; display: block; margin-bottom: 4px; animation: bounce 2s ease infinite; }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .header h1 { font-size: 1.6rem; font-weight: 800; }
+  .lang-btn {
+    position: absolute; top: 0; left: 0;
+    background: var(--card); border: 2px solid var(--card-border);
+    color: var(--text); border-radius: 12px; padding: 6px 12px;
+    font-size: 1rem; cursor: pointer; font-weight: 700;
+    transition: background 0.2s;
+  }
+  [dir="ltr"] .lang-btn { left: auto; right: 0; }
+  .lang-btn:hover { background: var(--card-hover); }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 2px solid var(--card-border);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 14px;
+    transition: transform 0.15s;
+  }
+  .card:active { transform: scale(0.98); }
+  .card-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.15rem; font-weight: 700; margin-bottom: 12px;
+  }
+  .card-icon { font-size: 1.8rem; }
+
+  /* Stats */
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: center; }
+  .stat-box {
+    background: rgba(255,255,255,0.06); border-radius: 16px; padding: 14px 8px;
+  }
+  .stat-value { font-size: 2rem; font-weight: 800; }
+  .stat-label { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+
+  /* Badge */
+  .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 1rem; }
+  .badge { padding: 5px 14px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; }
+  .badge-green { background: var(--green); color: #000; box-shadow: 0 0 12px var(--green-glow); }
+  .badge-red { background: var(--red); color: #fff; box-shadow: 0 0 12px var(--red-glow); }
+  .badge-yellow { background: var(--yellow); color: #000; box-shadow: 0 0 12px var(--yellow-glow); animation: pulse 1s ease infinite; }
+  .badge-muted { background: rgba(255,255,255,0.1); color: var(--muted); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Buttons */
+  .btn {
+    border: none; padding: 16px 24px; border-radius: 16px;
+    font-size: 1.15rem; font-weight: 800; cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+    width: 100%; margin-top: 6px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:hover { transform: scale(1.02); }
+  .btn:active { transform: scale(0.97); }
+  .btn-green { background: var(--green); color: #000; box-shadow: 0 4px 20px var(--green-glow); }
+  .btn-red { background: var(--red); color: #fff; box-shadow: 0 4px 20px var(--red-glow); }
+  .btn-blue { background: var(--blue); color: #fff; box-shadow: 0 4px 20px var(--blue-glow); }
+  .btn-off { background: rgba(255,255,255,0.08); color: var(--muted); }
+
+  /* Select */
+  select {
+    width: 100%; padding: 14px; border-radius: 14px;
+    border: 2px solid var(--card-border); background: rgba(255,255,255,0.06);
+    color: var(--text); font-size: 1.05rem; font-weight: 600;
+    margin-bottom: 8px; -webkit-appearance: none; appearance: none;
+  }
+
+  /* Logs */
+  .logs {
+    max-height: 200px; overflow-y: auto;
+    font-family: 'Courier New', monospace; font-size: 0.8rem;
+    line-height: 1.6; color: var(--muted);
+    background: rgba(0,0,0,0.2); border-radius: 12px; padding: 10px;
+  }
+  .logs .entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .logs .time { color: #666; }
+  .logs .motion { color: var(--yellow); font-weight: 600; }
+
+  .footer { text-align: center; color: rgba(255,255,255,0.2); font-size: 0.75rem; margin-top: 16px; }
 </style>
 </head>
 <body>
 
-<h1>🛡️ Room Guard</h1>
+<div class="header">
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()">EN</button>
+  <span class="mascot">🛡️</span>
+  <h1 id="title">שומר החדר</h1>
+</div>
 
 <!-- Status -->
 <div class="card">
-  <h2>Status</h2>
+  <div class="card-title"><span class="card-icon">📊</span> <span data-i18n="status">סטטוס</span></div>
   <div class="stats-grid">
-    <div>
-      <div class="stat" id="motionCount">-</div>
-      <div class="stat-label">Motions Detected</div>
+    <div class="stat-box">
+      <div class="stat-value" id="motionCount">-</div>
+      <div class="stat-label" data-i18n="motions_detected">תנועות שזוהו</div>
     </div>
-    <div>
-      <div class="stat" id="lastEvent">-</div>
-      <div class="stat-label">Last Event</div>
+    <div class="stat-box">
+      <div class="stat-value" id="lastEvent">-</div>
+      <div class="stat-label" data-i18n="last_event">אירוע אחרון</div>
     </div>
   </div>
 </div>
 
 <!-- Motion Sensor -->
 <div class="card">
-  <h2>Motion Sensor</h2>
+  <div class="card-title"><span class="card-icon">👁️</span> <span data-i18n="motion_sensor">חיישן תנועה</span></div>
   <div class="status-row">
-    <span>Sensor</span>
+    <span data-i18n="sensor">חיישן</span>
     <span class="badge" id="armedBadge">—</span>
   </div>
-  <button class="btn btn-green" id="sensorToggle" onclick="toggleSensor()">▶ Arm</button>
+  <button class="btn btn-green" id="sensorToggle" onclick="toggleSensor()">
+    <span>🟢</span> <span data-i18n="arm">הפעל</span>
+  </button>
 </div>
 
 <!-- LED -->
 <div class="card">
-  <h2>LED</h2>
+  <div class="card-title"><span class="card-icon">💡</span> <span data-i18n="led_light">תאורה</span></div>
   <div class="status-row">
-    <span>Light</span>
+    <span data-i18n="light">אור</span>
     <span class="badge" id="ledBadge">—</span>
   </div>
-  <button class="btn btn-muted" id="ledToggle" onclick="toggleLed()">💡 Turn On</button>
+  <button class="btn btn-off" id="ledToggle" onclick="toggleLed()">
+    <span>💡</span> <span data-i18n="turn_on">הדלק</span>
+  </button>
 </div>
 
 <!-- Melodies -->
 <div class="card">
-  <h2>🎵 Play Melody</h2>
-  <select id="melodySelect"><option>Loading...</option></select>
-  <button class="btn btn-accent" onclick="playMelody()">▶ Play</button>
+  <div class="card-title"><span class="card-icon">🎵</span> <span data-i18n="play_melody">נגן מנגינה</span></div>
+  <select id="melodySelect"><option data-i18n="loading">טוען...</option></select>
+  <button class="btn btn-blue" onclick="playMelody()">
+    <span>▶️</span> <span data-i18n="play">נגן</span>
+  </button>
 </div>
 
 <!-- Logs -->
 <div class="card">
-  <h2>Recent Activity</h2>
+  <div class="card-title"><span class="card-icon">📋</span> <span data-i18n="recent_activity">פעילות אחרונה</span></div>
   <div class="logs" id="logContainer">
-    <div class="entry">Loading...</div>
+    <div class="entry" data-i18n="loading">טוען...</div>
   </div>
 </div>
 
-<p style="text-align:center; color:#444; font-size:0.75rem; margin-top:12px;">
-  Room Guard • Local Network Only
-</p>
+<div class="footer">
+  <span data-i18n="footer">שומר החדר • רשת מקומית בלבד</span>
+</div>
 
 <script>
 const API = '';
 let _armed = false;
 let _ledOn = false;
 
+/* ── i18n ── */
+const LANG = {
+  he: {
+    title: 'שומר החדר',
+    status: 'סטטוס',
+    motions_detected: 'תנועות שזוהו',
+    last_event: 'אירוע אחרון',
+    motion_sensor: 'חיישן תנועה',
+    sensor: 'חיישן',
+    arm: 'הפעל',
+    disarm: 'השבת',
+    armed: '● פעיל',
+    disarmed: '○ מושבת',
+    playing: '🎵 מנגן',
+    led_light: 'תאורה',
+    light: 'אור',
+    turn_on: 'הדלק',
+    turn_off: 'כבה',
+    led_on: '● דלוק',
+    led_off: '○ כבוי',
+    play_melody: 'נגן מנגינה',
+    play: 'נגן',
+    recent_activity: 'פעילות אחרונה',
+    no_events: 'אין אירועים עדיין',
+    loading: 'טוען...',
+    footer: 'שומר החדר • רשת מקומית בלבד',
+    lang_toggle: 'EN',
+  },
+  en: {
+    title: 'Room Guard',
+    status: 'Status',
+    motions_detected: 'Motions Detected',
+    last_event: 'Last Event',
+    motion_sensor: 'Motion Sensor',
+    sensor: 'Sensor',
+    arm: 'Arm',
+    disarm: 'Disarm',
+    armed: '● Armed',
+    disarmed: '○ Disarmed',
+    playing: '🎵 Playing',
+    led_light: 'LED Light',
+    light: 'Light',
+    turn_on: 'Turn On',
+    turn_off: 'Turn Off',
+    led_on: '● On',
+    led_off: '○ Off',
+    play_melody: 'Play Melody',
+    play: 'Play',
+    recent_activity: 'Recent Activity',
+    no_events: 'No events yet',
+    loading: 'Loading...',
+    footer: 'Room Guard • Local Network Only',
+    lang_toggle: 'עב',
+  }
+};
+
+let currentLang = localStorage.getItem('rg_lang') || 'he';
+
+function t(key) { return LANG[currentLang][key] || key; }
+
+function applyLang() {
+  const html = document.documentElement;
+  html.lang = currentLang;
+  html.dir = currentLang === 'he' ? 'rtl' : 'ltr';
+  document.title = (currentLang === 'he' ? '🛡️ שומר החדר' : '🛡️ Room Guard');
+  document.getElementById('title').textContent = t('title');
+  document.getElementById('langBtn').textContent = t('lang_toggle');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key !== 'loading' || el.tagName !== 'OPTION') {
+      el.textContent = t(key);
+    }
+  });
+  // Re-sync dynamic elements
+  refreshStatus();
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'he' ? 'en' : 'he';
+  localStorage.setItem('rg_lang', currentLang);
+  applyLang();
+}
+
+/* ── API ── */
 async function postAction(url) {
   try { await fetch(API + url, { method: 'POST' }); refreshStatus(); } catch(e) { console.error(e); }
 }
@@ -123,25 +309,34 @@ async function refreshStatus() {
     document.getElementById('lastEvent').textContent = d.last_event ? d.last_event.split(' ')[1] : '—';
 
     const ab = document.getElementById('armedBadge');
-    if (d.playing) { ab.textContent = '🎵 Playing'; ab.className = 'badge badge-yellow'; }
-    else if (d.armed) { ab.textContent = '● Armed'; ab.className = 'badge badge-green'; }
-    else { ab.textContent = '○ Disarmed'; ab.className = 'badge badge-muted'; }
+    if (d.playing) { ab.textContent = t('playing'); ab.className = 'badge badge-yellow'; }
+    else if (d.armed) { ab.textContent = t('armed'); ab.className = 'badge badge-green'; }
+    else { ab.textContent = t('disarmed'); ab.className = 'badge badge-muted'; }
 
     const lb = document.getElementById('ledBadge');
-    lb.textContent = d.led_on ? '● On' : '○ Off';
+    lb.textContent = d.led_on ? t('led_on') : t('led_off');
     lb.className = d.led_on ? 'badge badge-green' : 'badge badge-muted';
 
-    // Sync toggle buttons
     _armed = d.armed;
     _ledOn = d.led_on;
 
     const st = document.getElementById('sensorToggle');
-    if (d.armed) { st.textContent = '⏸ Disarm'; st.className = 'btn btn-red'; }
-    else { st.textContent = '▶ Arm'; st.className = 'btn btn-green'; }
+    if (d.armed) {
+      st.className = 'btn btn-red';
+      st.innerHTML = `<span>🔴</span> <span>${t('disarm')}</span>`;
+    } else {
+      st.className = 'btn btn-green';
+      st.innerHTML = `<span>🟢</span> <span>${t('arm')}</span>`;
+    }
 
     const lt = document.getElementById('ledToggle');
-    if (d.led_on) { lt.textContent = '💡 Turn Off'; lt.className = 'btn btn-red'; }
-    else { lt.textContent = '💡 Turn On'; lt.className = 'btn btn-muted'; }
+    if (d.led_on) {
+      lt.className = 'btn btn-red';
+      lt.innerHTML = `<span>💡</span> <span>${t('turn_off')}</span>`;
+    } else {
+      lt.className = 'btn btn-off';
+      lt.innerHTML = `<span>💡</span> <span>${t('turn_on')}</span>`;
+    }
   } catch(e) { console.error(e); }
 }
 
@@ -150,7 +345,7 @@ async function refreshLogs() {
     const r = await fetch(API + '/api/logs?limit=30');
     const d = await r.json();
     const c = document.getElementById('logContainer');
-    if (!d.logs.length) { c.innerHTML = '<div class="entry">No events yet</div>'; return; }
+    if (!d.logs.length) { c.innerHTML = `<div class="entry">${t('no_events')}</div>`; return; }
     c.innerHTML = d.logs.map(l => {
       const cls = l.message.includes('MOTION') ? ' motion' : '';
       return `<div class="entry${cls}"><span class="time">${l.time.split(' ')[1]}</span> ${l.message}</div>`;
@@ -163,11 +358,12 @@ async function loadMelodies() {
     const r = await fetch(API + '/api/melodies');
     const d = await r.json();
     const sel = document.getElementById('melodySelect');
-    sel.innerHTML = d.melodies.map(m => `<option value="${m}">${m}</option>`).join('');
+    sel.innerHTML = d.melodies.map(m => `<option value="${m}">🎶 ${m}</option>`).join('');
   } catch(e) { console.error(e); }
 }
 
 // Initial load
+applyLang();
 loadMelodies();
 refreshStatus();
 refreshLogs();
