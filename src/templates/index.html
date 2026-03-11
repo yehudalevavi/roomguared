@@ -23,8 +23,7 @@
   .btn-green { background: var(--green); color: #000; }
   .btn-red { background: var(--red); color: #fff; }
   .btn-accent { background: var(--accent); color: var(--text); }
-  .btn-row { display: flex; gap: 8px; }
-  .btn-row .btn { flex: 1; }
+  .btn-muted { background: #333; color: var(--muted); }
   select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: var(--text); font-size: 0.95rem; margin-bottom: 6px; }
   .logs { max-height: 250px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.5; color: var(--muted); }
   .logs .entry { padding: 2px 0; border-bottom: 1px solid #222; }
@@ -61,10 +60,7 @@
     <span>Sensor</span>
     <span class="badge" id="armedBadge">—</span>
   </div>
-  <div class="btn-row">
-    <button class="btn btn-green" onclick="postAction('/api/arm')">▶ Arm</button>
-    <button class="btn btn-red" onclick="postAction('/api/disarm')">⏸ Disarm</button>
-  </div>
+  <button class="btn btn-green" id="sensorToggle" onclick="toggleSensor()">▶ Arm</button>
 </div>
 
 <!-- LED -->
@@ -74,10 +70,7 @@
     <span>Light</span>
     <span class="badge" id="ledBadge">—</span>
   </div>
-  <div class="btn-row">
-    <button class="btn btn-green" onclick="postAction('/api/led/on')">💡 On</button>
-    <button class="btn btn-red" onclick="postAction('/api/led/off')">Off</button>
-  </div>
+  <button class="btn btn-muted" id="ledToggle" onclick="toggleLed()">💡 Turn On</button>
 </div>
 
 <!-- Melodies -->
@@ -101,9 +94,19 @@
 
 <script>
 const API = '';
+let _armed = false;
+let _ledOn = false;
 
 async function postAction(url) {
   try { await fetch(API + url, { method: 'POST' }); refreshStatus(); } catch(e) { console.error(e); }
+}
+
+async function toggleSensor() {
+  await postAction(_armed ? '/api/disarm' : '/api/arm');
+}
+
+async function toggleLed() {
+  await postAction(_ledOn ? '/api/led/off' : '/api/led/on');
 }
 
 async function playMelody() {
@@ -127,6 +130,18 @@ async function refreshStatus() {
     const lb = document.getElementById('ledBadge');
     lb.textContent = d.led_on ? '● On' : '○ Off';
     lb.className = d.led_on ? 'badge badge-green' : 'badge badge-muted';
+
+    // Sync toggle buttons
+    _armed = d.armed;
+    _ledOn = d.led_on;
+
+    const st = document.getElementById('sensorToggle');
+    if (d.armed) { st.textContent = '⏸ Disarm'; st.className = 'btn btn-red'; }
+    else { st.textContent = '▶ Arm'; st.className = 'btn btn-green'; }
+
+    const lt = document.getElementById('ledToggle');
+    if (d.led_on) { lt.textContent = '💡 Turn Off'; lt.className = 'btn btn-red'; }
+    else { lt.textContent = '💡 Turn On'; lt.className = 'btn btn-muted'; }
   } catch(e) { console.error(e); }
 }
 
