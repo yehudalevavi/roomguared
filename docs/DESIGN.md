@@ -300,6 +300,19 @@ If the LED doesn't light up or the buzzer doesn't sound, check the [Troubleshoot
 
 ### Run manually
 
+There are two ways to run the Room Guard:
+
+**Option A — Web Dashboard (recommended):**
+
+```bash
+source .venv/bin/activate
+python3 src/web_app.py
+```
+
+Then open **`http://room-guard:5000`** in your browser (phone or laptop). The dashboard lets you arm/disarm the sensor, toggle the LED, play melodies, and view the activity log — all from a web interface.
+
+**Option B — Standalone CLI (no web UI):**
+
 ```bash
 source .venv/bin/activate
 python3 src/room_guard.py
@@ -329,6 +342,8 @@ Press **Ctrl+C** to stop (plays a descending disarm melody).
 ---
 
 ## Step 5 — Auto-Start on Boot
+
+The systemd service runs the **web dashboard** (`web_app.py`), which includes all Room Guard functionality and makes the dashboard available at `http://room-guard:5000` on boot.
 
 ### Install the systemd service
 
@@ -362,32 +377,61 @@ sudo systemctl stop room_guard
 ## Application Architecture
 
 ```
-┌─────────────────┐         ┌──────────────────┐         ┌───────────┐
-│   HC-SR501      │  RISING │                  │  HIGH   │   LED     │
-│   PIR Sensor    │────────▶│   room_guard.py  │────────▶│  GPIO 27  │
-│   (GPIO 17)     │  EDGE   │                  │         └───────────┘
-└─────────────────┘         │  1. Startup ♪    │         ┌───────────┐
-                            │  2. Detect       │   PWM   │  Passive  │
-                            │  3. Alarm ♪ + LED│────────▶│  Buzzer   │
-                            │  4. Cooldown     │         │  GPIO 22  │
-                            │  5. Log event    │         └───────────┘
-                            │  6. Disarm ♪     │
-                            └──────────────────┘
-                                    │
-                            ┌───────┘
-                            ▼
-                      src/buzzer.py
-                      (PWM melodies)
+Browser (phone/laptop)           Raspberry Pi
+┌──────────────┐     HTTP       ┌──────────────────────────────────┐
+│  Dashboard   │◄──────────────►│  Flask web_app.py (port 5000)   │
+│  index.html  │   local net    │         │                        │
+└──────────────┘                │   RoomGuard class                │
+                                │   (room_guard.py)                │
+                                │    ├── PIR sensor (GPIO 17)      │
+                                │    ├── LED (GPIO 27)             │
+                                │    ├── Buzzer (GPIO 22)          │
+                                │    └── Melody library (20 tunes) │
+                                └──────────────────────────────────┘
 ```
+
+### Components
+
+- **`src/web_app.py`** — Flask web application. Serves the dashboard HTML and a REST API for controlling the system. Binds to `0.0.0.0:5000`. Hardware initializes in a background thread so the dashboard is available immediately (PIR needs 40s to calibrate).
+- **`src/room_guard.py`** — `RoomGuard` class that manages all hardware (PIR, LED, buzzer) and application state (armed/disarmed, motion count, event log). Thread-safe — all state is protected with a lock since Flask serves from multiple threads and gpiozero callbacks run in their own thread. Can also run standalone as a CLI app (`python3 src/room_guard.py`).
+- **`src/buzzer.py`** — PWM buzzer driver with a full chromatic scale (C4–C6). Provides system melodies (startup, arm, disarm, sensor error) and the `Buzzer` class for playing tones and melodies.
+- **`src/melody_library.py`** — Library of 20 famous public-domain melodies. `get_random_melody()` returns a random melody for motion alerts.
+- **`src/templates/index.html`** — Single-page responsive dashboard. Dark theme, mobile-friendly, no CDN dependencies (works offline on local network). Auto-refreshes status (3s) and logs (5s) via `fetch` API.
+
+### Web Dashboard
+
+The dashboard is accessible at `http://room-guard:5000` from any device on the local network.
+
+**Dashboard controls:**
+- **Motion Sensor** — Toggle button to arm/disarm. Shows armed state with a status badge (● Armed / ○ Disarmed / 🎵 Playing).
+- **LED** — Toggle button to turn on/off. Badge shows current state.
+- **Play Melody** — Dropdown of all 20 melodies + play button. Plays the selected melody on the buzzer.
+- **Status** — Motion count and last event time (auto-refreshes every 3 seconds).
+- **Activity Log** — Scrollable log of recent events including motion detections with melody names (auto-refreshes every 5 seconds).
+
+**REST API endpoints:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Dashboard HTML page |
+| GET | `/api/status` | JSON: armed, motion count, last event, LED state, playing |
+| POST | `/api/arm` | Enable motion detection |
+| POST | `/api/disarm` | Disable motion detection |
+| POST | `/api/led/on` | Turn LED on |
+| POST | `/api/led/off` | Turn LED off |
+| POST | `/api/play/<name>` | Play a specific melody by name |
+| GET | `/api/melodies` | List all 20 available melody names |
+| GET | `/api/logs?limit=50` | Recent activity log entries (JSON) |
 
 ### How it works
 
-1. **Initialization**: Set up GPIO devices using `gpiozero` (MotionSensor for PIR, LED for the light, PWMOutputDevice for the passive buzzer via `src/buzzer.py`). Play the startup jingle. Register a motion callback on the PIR sensor.
-2. **Waiting**: The main thread sleeps while `gpiozero` watches for motion on GPIO 17.
-3. **Motion detected**: The callback fires — a random melody is selected from the 20-melody library (`src/melody_library.py`). The LED turns on, the melody plays via PWM, and the melody name is logged.
-4. **Cooldown**: After the configured cooldown period (default 10s), the system returns to waiting.
-5. **Repeat**: System is ready to detect again. Each detection plays a different random melody.
-6. **Shutdown**: On SIGINT (Ctrl+C) or SIGTERM (systemd stop), the disarm melody plays, then all GPIO pins are cleaned up.
+1. **Startup**: `web_app.py` creates a `RoomGuard` instance and starts Flask on port 5000. Hardware initialization (GPIO setup + PIR calibration) runs in a background daemon thread so the dashboard is immediately available.
+2. **Calibration**: The PIR sensor requires ~40 seconds to calibrate. During this time, the dashboard is accessible and shows status, but motion detection is not yet armed.
+3. **Auto-arm**: After calibration completes, the system automatically arms the motion sensor.
+4. **Motion detected**: The PIR callback fires — a random melody is selected from the 20-melody library. The LED turns on, the melody plays via PWM, and the event (with melody name) is logged.
+5. **Cooldown**: After the configured cooldown period (default 10s), the system returns to watching for the next motion.
+6. **Dashboard control**: Users can arm/disarm, toggle the LED, and play melodies on demand via the web UI at any time. All controls respond immediately.
+7. **Shutdown**: On SIGINT or SIGTERM (systemd stop), all GPIO pins are cleaned up gracefully.
 
 ---
 
@@ -416,7 +460,14 @@ The application is deployed at:
 ```bash
 ssh yehudalevavi@room-guard
 cd ~/rpiProject
+sudo systemctl stop room_guard   # Stop the service first
 source .venv/bin/activate
+python3 src/web_app.py           # Run interactively (Ctrl+C to stop)
+```
+
+Or for CLI-only debugging (no web UI):
+
+```bash
 python3 src/room_guard.py
 ```
 
@@ -443,3 +494,5 @@ ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
 | DHT11 reads all fail | Check DATA wire is on Pin 7 (GPIO 4). Ensure VCC is on 5V. Install `libgpiod2`: `sudo apt install -y libgpiod2` |
 | DHT11 reads are flaky | Normal — the DHT11 fails ~10-20% of reads. The sensor module retries automatically. |
 | Service won't start | Check `journalctl -u room_guard -e` for errors. Verify file paths in .service file. |
+| Dashboard won't load | Verify the service is running: `sudo systemctl status room_guard`. Check port 5000 is not blocked. Try `http://<Pi-IP>:5000` if hostname doesn't resolve. |
+| Dashboard shows "Disarmed" after boot | Normal — the PIR sensor needs ~40 seconds to calibrate, then it auto-arms. Refresh the page after a minute. |

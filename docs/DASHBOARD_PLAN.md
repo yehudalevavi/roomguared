@@ -107,6 +107,8 @@ All components share power via the **breadboard power rails** — one wire from 
 
 ## Phase 3: Web-Based Control Panel
 
+**Status: ✅ Complete**
+
 **Goal:** Create a lightweight web UI served from the Pi to control the Room Guard from any device on the local network (phone, laptop, etc.) at `http://room-guard:5000`.
 
 **Why:** Right now, controlling the Room Guard requires SSH access and command-line skills. A simple web dashboard lets anyone in the family start/stop the sensor, play melodies, and toggle the LED — all from a browser.
