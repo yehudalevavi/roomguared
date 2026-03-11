@@ -54,7 +54,7 @@ class TestBuzzerLifecycle(unittest.TestCase):
     def test_start_creates_pwm_device(self):
         buzzer = Buzzer(pin=22)
         mock_pwm_cls = MagicMock()
-        mock_gpiozero.PWMOutputDevice = mock_pwm_cls
+        sys.modules["gpiozero"].PWMOutputDevice = mock_pwm_cls
 
         buzzer.start()
 
@@ -63,7 +63,7 @@ class TestBuzzerLifecycle(unittest.TestCase):
     def test_start_turns_off_device(self):
         buzzer = Buzzer()
         mock_device = MagicMock()
-        mock_gpiozero.PWMOutputDevice.return_value = mock_device
+        sys.modules["gpiozero"].PWMOutputDevice.return_value = mock_device
 
         buzzer.start()
 

@@ -7,7 +7,7 @@ Type=simple
 User=yehudalevavi
 WorkingDirectory=/home/yehudalevavi/rpiProject
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/yehudalevavi/rpiProject/.venv/bin/python3 /home/yehudalevavi/rpiProject/src/room_guard.py
+ExecStart=/home/yehudalevavi/rpiProject/.venv/bin/python3 /home/yehudalevavi/rpiProject/src/web_app.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

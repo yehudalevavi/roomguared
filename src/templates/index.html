@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ Room Guard</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --accent: #0f3460; --green: #4ecca3; --red: #e84545; --yellow: #f5c542; --text: #eee; --muted: #999; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; }
+  h1 { text-align: center; margin-bottom: 16px; font-size: 1.5rem; }
+  .card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 1rem; margin-bottom: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .status-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+  .badge-green { background: var(--green); color: #000; }
+  .badge-red { background: var(--red); color: #fff; }
+  .badge-yellow { background: var(--yellow); color: #000; }
+  .badge-muted { background: #333; color: var(--muted); }
+  .btn { border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; width: 100%; margin-top: 6px; }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { opacity: 0.7; }
+  .btn-green { background: var(--green); color: #000; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-accent { background: var(--accent); color: var(--text); }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row .btn { flex: 1; }
+  select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: var(--text); font-size: 0.95rem; margin-bottom: 6px; }
+  .logs { max-height: 250px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.5; color: var(--muted); }
+  .logs .entry { padding: 2px 0; border-bottom: 1px solid #222; }
+  .logs .time { color: #666; }
+  .logs .motion { color: var(--yellow); }
+  .stat { font-size: 1.4rem; font-weight: 700; }
+  .stat-label { font-size: 0.8rem; color: var(--muted); }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>🛡️ Room Guard</h1>
+
+<!-- Status -->
+<div class="card">
+  <h2>Status</h2>
+  <div class="stats-grid">
+    <div>
+      <div class="stat" id="motionCount">-</div>
+      <div class="stat-label">Motions Detected</div>
+    </div>
+    <div>
+      <div class="stat" id="lastEvent">-</div>
+      <div class="stat-label">Last Event</div>
+    </div>
+  </div>
+</div>
+
+<!-- Motion Sensor -->
+<div class="card">
+  <h2>Motion Sensor</h2>
+  <div class="status-row">
+    <span>Sensor</span>
+    <span class="badge" id="armedBadge">—</span>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-green" onclick="postAction('/api/arm')">▶ Arm</button>
+    <button class="btn btn-red" onclick="postAction('/api/disarm')">⏸ Disarm</button>
+  </div>
+</div>
+
+<!-- LED -->
+<div class="card">
+  <h2>LED</h2>
+  <div class="status-row">
+    <span>Light</span>
+    <span class="badge" id="ledBadge">—</span>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-green" onclick="postAction('/api/led/on')">💡 On</button>
+    <button class="btn btn-red" onclick="postAction('/api/led/off')">Off</button>
+  </div>
+</div>
+
+<!-- Melodies -->
+<div class="card">
+  <h2>🎵 Play Melody</h2>
+  <select id="melodySelect"><option>Loading...</option></select>
+  <button class="btn btn-accent" onclick="playMelody()">▶ Play</button>
+</div>
+
+<!-- Logs -->
+<div class="card">
+  <h2>Recent Activity</h2>
+  <div class="logs" id="logContainer">
+    <div class="entry">Loading...</div>
+  </div>
+</div>
+
+<p style="text-align:center; color:#444; font-size:0.75rem; margin-top:12px;">
+  Room Guard • Local Network Only
+</p>
+
+<script>
+const API = '';
+
+async function postAction(url) {
+  try { await fetch(API + url, { method: 'POST' }); refreshStatus(); } catch(e) { console.error(e); }
+}
+
+async function playMelody() {
+  const name = document.getElementById('melodySelect').value;
+  if (!name) return;
+  try { await fetch(API + '/api/play/' + encodeURIComponent(name), { method: 'POST' }); } catch(e) { console.error(e); }
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch(API + '/api/status');
+    const d = await r.json();
+    document.getElementById('motionCount').textContent = d.motion_count;
+    document.getElementById('lastEvent').textContent = d.last_event ? d.last_event.split(' ')[1] : '—';
+
+    const ab = document.getElementById('armedBadge');
+    if (d.playing) { ab.textContent = '🎵 Playing'; ab.className = 'badge badge-yellow'; }
+    else if (d.armed) { ab.textContent = '● Armed'; ab.className = 'badge badge-green'; }
+    else { ab.textContent = '○ Disarmed'; ab.className = 'badge badge-muted'; }
+
+    const lb = document.getElementById('ledBadge');
+    lb.textContent = d.led_on ? '● On' : '○ Off';
+    lb.className = d.led_on ? 'badge badge-green' : 'badge badge-muted';
+  } catch(e) { console.error(e); }
+}
+
+async function refreshLogs() {
+  try {
+    const r = await fetch(API + '/api/logs?limit=30');
+    const d = await r.json();
+    const c = document.getElementById('logContainer');
+    if (!d.logs.length) { c.innerHTML = '<div class="entry">No events yet</div>'; return; }
+    c.innerHTML = d.logs.map(l => {
+      const cls = l.message.includes('MOTION') ? ' motion' : '';
+      return `<div class="entry${cls}"><span class="time">${l.time.split(' ')[1]}</span> ${l.message}</div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadMelodies() {
+  try {
+    const r = await fetch(API + '/api/melodies');
+    const d = await r.json();
+    const sel = document.getElementById('melodySelect');
+    sel.innerHTML = d.melodies.map(m => `<option value="${m}">${m}</option>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+// Initial load
+loadMelodies();
+refreshStatus();
+refreshLogs();
+
+// Auto-refresh
+setInterval(refreshStatus, 3000);
+setInterval(refreshLogs, 5000);
+</script>
+</body>
+</html>
