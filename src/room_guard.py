@@ -21,7 +21,7 @@ PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
 LED_PIN = 27     # GPIO 27 (Physical pin 13) — LED anode via 220Ω
 COOLDOWN = 10    # Seconds to wait after alert before next detection
 MAX_LOG_ENTRIES = 100
-LCD_PAGE_INTERVAL = 5    # Seconds between LCD page cycles
+LCD_PAGE_INTERVAL = 10   # Seconds between LCD page cycles
 LCD_FLASH_DURATION = 3   # Seconds to show event messages on LCD
 
 
@@ -129,7 +129,7 @@ class RoomGuard:
         """Play a specific melody by name. Returns False if not found or busy."""
         for mel_name, notes in MOTION_MELODIES:
             if mel_name == name:
-                self._lcd_flash("Now playing:", name[:16])
+                self._lcd_flash("Now playing:", name)
                 threading.Thread(
                     target=self._play_melody_thread,
                     args=(mel_name, notes),
@@ -175,7 +175,7 @@ class RoomGuard:
             self._motion_count += 1
             self._last_event_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        self._lcd_flash("! MOTION !", name[:16])
+        self._lcd_flash("! MOTION !", name)
 
         if self._led:
             self._led.on()
@@ -250,30 +250,39 @@ class RoomGuard:
                     state = "ARMED" if self._armed else "DISARMED"
                     if self._playing:
                         state = "PLAYING"
-                self._lcd_show(
-                    f"Room Guard {state}"[:16],
-                    now.strftime("%H:%M:%S %d/%m"),
-                )
+                line1 = f"Room Guard {state}"
+                line2 = now.strftime("%H:%M:%S %d/%m/%y")
             elif page == 1:
                 # Page 2: Motion stats
                 with self._lock:
                     count = self._motion_count
                     last = self._last_event_time
                 last_short = last.split(" ")[1] if last else "None"
-                self._lcd_show(
-                    f"Motion: {count}",
-                    f"Last: {last_short}",
-                )
+                line1 = f"Motion count: {count}"
+                line2 = f"Last: {last_short}"
             elif page == 2:
-                # Page 3: LED status + uptime
+                # Page 3: LED status + date
                 with self._lock:
                     led = "ON" if self._led_on else "OFF"
-                self._lcd_show(
-                    f"LED: {led}",
-                    now.strftime("%Y-%m-%d"),
-                )
+                line1 = f"LED: {led}"
+                line2 = now.strftime("%Y-%m-%d")
+            else:
+                line1, line2 = "", ""
 
-            # Wait for page interval, checking for stop every 0.5s
+            # Use scrolling for long text, with stop checks
+            def should_stop():
+                return (not self._lcd_running or
+                        time.monotonic() < self._lcd_flash_until)
+
+            try:
+                if self._lcd._lcd is not None:
+                    with self._lcd_lock:
+                        self._lcd.scroll_text(
+                            line1, line2, check_stop=should_stop)
+            except Exception:
+                pass
+
+            # Hold the page for remaining time
             for _ in range(LCD_PAGE_INTERVAL * 2):
                 if not self._lcd_running:
                     return

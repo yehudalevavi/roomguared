@@ -120,3 +120,63 @@ class LCDDisplay:
     def _pad(self, text: str) -> str:
         """Truncate to LCD width and pad with spaces to overwrite old text."""
         return text[:self.cols].ljust(self.cols)
+
+    def scroll_text(self, line1: str = "", line2: str = "",
+                    delay: float = 0.35, pause: float = 1.5,
+                    check_stop=None) -> None:
+        """
+        Display text with horizontal scrolling for lines longer than LCD width.
+
+        Short lines (≤16 chars) are displayed normally. Long lines scroll
+        left so the full text can be read, then snap back.
+
+        Args:
+            line1: Text for the top row.
+            line2: Text for the bottom row.
+            delay: Seconds between each scroll step.
+            pause: Seconds to pause at start and end of scroll.
+            check_stop: Optional callable returning True to abort early.
+        """
+        if self._lcd is None:
+            raise RuntimeError("LCD not started. Call start() first.")
+
+        needs_scroll_1 = len(line1) > self.cols
+        needs_scroll_2 = len(line2) > self.cols
+
+        if not needs_scroll_1 and not needs_scroll_2:
+            self.write(line1, line2)
+            return
+
+        # Pad short lines so they don't scroll
+        pad1 = line1 if needs_scroll_1 else line1[:self.cols]
+        pad2 = line2 if needs_scroll_2 else line2[:self.cols]
+
+        max_offset = max(
+            len(pad1) - self.cols if needs_scroll_1 else 0,
+            len(pad2) - self.cols if needs_scroll_2 else 0,
+        )
+
+        # Show start position with a pause
+        self.write(pad1[:self.cols], pad2[:self.cols])
+        for _ in range(int(pause / 0.1)):
+            if check_stop and check_stop():
+                return
+            import time
+            time.sleep(0.1)
+
+        # Scroll left one character at a time
+        for offset in range(1, max_offset + 1):
+            if check_stop and check_stop():
+                return
+            w1 = pad1[offset:offset + self.cols] if needs_scroll_1 else pad1
+            w2 = pad2[offset:offset + self.cols] if needs_scroll_2 else pad2
+            self.write(w1.ljust(self.cols), w2.ljust(self.cols))
+            import time
+            time.sleep(delay)
+
+        # Pause at the end
+        for _ in range(int(pause / 0.1)):
+            if check_stop and check_stop():
+                return
+            import time
+            time.sleep(0.1)
