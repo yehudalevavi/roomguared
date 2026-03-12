@@ -14,12 +14,15 @@ from datetime import datetime
 
 from buzzer import Buzzer, MELODY_STARTUP, MELODY_DISARM, melody_duration
 from melody_library import MOTION_MELODIES, get_random_melody
+from lcd_display import LCDDisplay
 
 # --- Configuration ---
 PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
 LED_PIN = 27     # GPIO 27 (Physical pin 13) — LED anode via 220Ω
 COOLDOWN = 10    # Seconds to wait after alert before next detection
 MAX_LOG_ENTRIES = 100
+LCD_PAGE_INTERVAL = 5    # Seconds between LCD page cycles
+LCD_FLASH_DURATION = 3   # Seconds to show event messages on LCD
 
 
 class RoomGuard:
@@ -48,6 +51,13 @@ class RoomGuard:
         self._pir = None
         self._led = None
         self._buzzer = Buzzer()
+        self._lcd = LCDDisplay()
+
+        # LCD cycling state
+        self._lcd_running = False
+        self._lcd_thread: threading.Thread | None = None
+        self._lcd_flash_until: float = 0  # timestamp when flash message expires
+        self._lcd_lock = threading.Lock()  # protects all LCD hardware writes
 
     def start(self) -> None:
         """Initialize hardware devices."""
@@ -56,15 +66,30 @@ class RoomGuard:
         self._led = GPIOLed(self.led_pin)
         self._buzzer.start()
         self._started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Initialize LCD (non-fatal if it fails)
+        try:
+            self._lcd.start()
+            self._lcd_running = True
+            self._lcd_thread = threading.Thread(target=self._lcd_cycle_loop, daemon=True)
+            self._lcd_thread.start()
+        except Exception as e:
+            print(f"[Room Guard] WARNING: LCD init failed: {e}")
+            self._lcd_running = False
+
         self._log_message("System started")
 
     def stop(self) -> None:
         """Shut down hardware."""
         self.disarm()
+        self._lcd_running = False
         if self._led:
             self._led.off()
         self._buzzer.play_melody(MELODY_DISARM)
         self._buzzer.stop()
+        self._lcd_show("Room Guard OFF", "Goodbye!")
+        time.sleep(1)
+        self._lcd.stop()
         self._log_message("System stopped")
 
     def arm(self) -> None:
@@ -75,6 +100,7 @@ class RoomGuard:
             self._armed = True
             if self._pir:
                 self._pir.when_motion = self._on_motion
+        self._lcd_flash(">> ARMED <<", "Watching...")
         self._log_message("Armed — watching for motion")
 
     def disarm(self) -> None:
@@ -85,6 +111,7 @@ class RoomGuard:
             self._armed = False
             if self._pir:
                 self._pir.when_motion = None
+        self._lcd_flash(">> DISARMED <<", "Sensor paused")
         self._log_message("Disarmed")
 
     def set_led(self, on: bool) -> None:
@@ -96,11 +123,13 @@ class RoomGuard:
                     self._led.on()
                 else:
                     self._led.off()
+        self._lcd_flash("LED", "ON" if on else "OFF")
 
     def play_melody_by_name(self, name: str) -> bool:
         """Play a specific melody by name. Returns False if not found or busy."""
         for mel_name, notes in MOTION_MELODIES:
             if mel_name == name:
+                self._lcd_flash("Now playing:", name[:16])
                 threading.Thread(
                     target=self._play_melody_thread,
                     args=(mel_name, notes),
@@ -146,6 +175,8 @@ class RoomGuard:
             self._motion_count += 1
             self._last_event_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        self._lcd_flash("! MOTION !", name[:16])
+
         if self._led:
             self._led.on()
         self._buzzer.play_melody(melody)
@@ -177,6 +208,80 @@ class RoomGuard:
             self._event_log.append(entry)
             if len(self._event_log) > MAX_LOG_ENTRIES:
                 self._event_log = self._event_log[-MAX_LOG_ENTRIES:]
+
+    # --- LCD ---
+
+    def _lcd_show(self, line1: str, line2: str = "") -> None:
+        """Write text to the LCD (safe — does nothing if LCD unavailable)."""
+        try:
+            if self._lcd._lcd is not None:
+                with self._lcd_lock:
+                    self._lcd.write(line1, line2)
+        except Exception:
+            pass
+
+    def _lcd_flash(self, line1: str, line2: str = "") -> None:
+        """Show a temporary message on the LCD for LCD_FLASH_DURATION seconds."""
+        self._lcd_flash_until = time.monotonic() + LCD_FLASH_DURATION
+        try:
+            if self._lcd._lcd is not None:
+                with self._lcd_lock:
+                    # Clear cached lines so the next cycle page does a full rewrite
+                    self._lcd._line1 = ""
+                    self._lcd._line2 = ""
+                    self._lcd.write(line1, line2)
+        except Exception:
+            pass
+
+    def _lcd_cycle_loop(self) -> None:
+        """Background thread: cycle LCD between status pages."""
+        page = 0
+        while self._lcd_running:
+            # If a flash message is active, don't overwrite it
+            if time.monotonic() < self._lcd_flash_until:
+                time.sleep(0.5)
+                continue
+
+            now = datetime.now()
+
+            if page == 0:
+                # Page 1: Status + current time
+                with self._lock:
+                    state = "ARMED" if self._armed else "DISARMED"
+                    if self._playing:
+                        state = "PLAYING"
+                self._lcd_show(
+                    f"Room Guard {state}"[:16],
+                    now.strftime("%H:%M:%S %d/%m"),
+                )
+            elif page == 1:
+                # Page 2: Motion stats
+                with self._lock:
+                    count = self._motion_count
+                    last = self._last_event_time
+                last_short = last.split(" ")[1] if last else "None"
+                self._lcd_show(
+                    f"Motion: {count}",
+                    f"Last: {last_short}",
+                )
+            elif page == 2:
+                # Page 3: LED status + uptime
+                with self._lock:
+                    led = "ON" if self._led_on else "OFF"
+                self._lcd_show(
+                    f"LED: {led}",
+                    now.strftime("%Y-%m-%d"),
+                )
+
+            # Wait for page interval, checking for stop every 0.5s
+            for _ in range(LCD_PAGE_INTERVAL * 2):
+                if not self._lcd_running:
+                    return
+                if time.monotonic() < self._lcd_flash_until:
+                    break
+                time.sleep(0.5)
+
+            page = (page + 1) % 3
 
 
 # --- Standalone CLI mode ---

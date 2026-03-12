@@ -1,3 +1,4 @@
 gpiozero>=2.0
 adafruit-circuitpython-dht
 flask>=3.0
+RPLCD>=1.3

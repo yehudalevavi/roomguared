@@ -182,6 +182,10 @@ Browser (phone/laptop)          Raspberry Pi
 
 ## Phase 4: LCD1602 Display (4-bit parallel mode)
 
+**Status: ⏸️ Code-complete — waiting for hardware**
+
+> The display module and unit tests are implemented and committed. When you have the physical LCD1602, potentiometer, and jumper wires, complete the remaining steps below.
+
 **Goal:** Display text on the LCD screen.
 
 **New wiring (12 wires + potentiometer):**
@@ -217,10 +221,23 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 > After powering on, slowly turn the potentiometer until you see solid rectangles on the LCD top row — that means contrast is correct.
 
-**Software:**
-- Install `RPLCD` library
-- Create `src/test_lcd.py` — displays "Hello Room Guard!" on line 1 and "LCD Working!" on line 2
-- Test clearing the screen and writing new text
+**Software (done ✅):**
+- Install `RPLCD` library (added to `requirements.txt`)
+- `src/lcd_display.py` — LCD module with:
+  - `LCDDisplay` class with start/stop lifecycle
+  - `write(line1, line2)` — write text with automatic truncation and padding
+  - `clear()` — clear both lines
+  - Change-detection cache to reduce flicker (only rewrites changed lines)
+  - `line1`/`line2` read-only properties for current display content
+- `src/test_lcd.py` — hardware test that displays "Hello Room Guard!" and cycles through text patterns
+- `tests/test_lcd_unit.py` — 27 unit tests (pass without hardware)
+
+**When the LCD arrives — remaining steps:**
+1. **Wire** the LCD1602 to the breadboard using the table above (power off the Pi first!)
+2. **Wire** the potentiometer for contrast adjustment
+3. **Test** hardware: `source .venv/bin/activate && python3 src/test_lcd.py`
+4. Adjust the **potentiometer** until text is clearly visible
+5. **Integrate** the LCD into `room_guard.py` (Phase 7)
 
 **Validation:**
 - ✅ LCD backlight turns on when powered

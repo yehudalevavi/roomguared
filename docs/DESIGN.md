@@ -41,8 +41,10 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 | 5 | LED (any color)        | 1   | ~$0.10      | Standard 5mm through-hole              |
 | 6 | 220Ω resistor          | 1   | ~$0.05      | ¼W, for LED current limiting           |
 | 7 | Passive buzzer         | 1   | ~$1         | 3V–5V, **no** white sticker on top (unlike active buzzer) |
-| 8 | Breadboard             | 1   | ~$3         | Half-size or full-size                  |
-| 9 | Jumper wires (Male-to-Female) | ~10 | ~$2  | For connecting RPi GPIO to breadboard  |
+| 8 | LCD1602 display        | 1   | ~$3         | 16×2 character LCD, HD44780 controller  |
+| 9 | 10KΩ potentiometer     | 1   | ~$0.50      | For LCD contrast adjustment             |
+| 10 | Breadboard             | 1   | ~$3         | Half-size or full-size                  |
+| 11 | Jumper wires (Male-to-Female) | ~20 | ~$2  | For connecting RPi GPIO to breadboard  |
 
 ---
 
@@ -154,6 +156,12 @@ All components then tap power and ground from these rails. This keeps wiring cle
 | LED (+) via 220Ω | GPIO 27   | Pin 13      | OUTPUT    |
 | Buzzer (+)       | GPIO 22   | Pin 15      | PWM OUTPUT |
 | DHT11 DATA       | GPIO 4    | Pin 7       | INPUT     |
+| LCD RS           | GPIO 26   | Pin 37      | OUTPUT    |
+| LCD E            | GPIO 19   | Pin 35      | OUTPUT    |
+| LCD D4           | GPIO 13   | Pin 33      | OUTPUT    |
+| LCD D5           | GPIO 6    | Pin 31      | OUTPUT    |
+| LCD D6           | GPIO 5    | Pin 29      | OUTPUT    |
+| LCD D7           | GPIO 11   | Pin 23      | OUTPUT    |
 
 > All component VCC pins connect to the breadboard **+ rail**, and all GND pins to the **− rail**.
 
@@ -176,6 +184,23 @@ All components then tap power and ground from these rails. This keeps wiring cle
          ┌──────────────────────────────── Buzzer (+)
   GPIO22 (15)(16) GPIO23
     3V3  (17)(18) GPIO24
+  GPIO10 (19)(20) GND
+   GPIO9 (21)(22) GPIO25
+         ┌──────────────────────────────── LCD D7
+  GPIO11 (23)(24) GPIO8
+    GND  (25)(26) GPIO7
+   GPIO0 (27)(28) GPIO1
+         ┌──────────────────────────────── LCD D6
+   GPIO5 (29)(30) GND
+         ┌──────────────────────────────── LCD D5
+   GPIO6 (31)(32) GPIO12
+         ┌──────────────────────────────── LCD D4
+  GPIO13 (33)(34) GND
+         ┌──────────────────────────────── LCD Enable (E)
+  GPIO19 (35)(36) GPIO16
+         ┌──────────────────────────────── LCD Register Select (RS)
+  GPIO26 (37)(38) GPIO20
+    GND  (39)(40) GPIO21
 
 
     Breadboard (830 tie-points)
@@ -192,6 +217,18 @@ All components then tap power and ground from these rails. This keeps wiring cle
     │                                               │
     │  DHT11 (+) ──── + rail                        │
     │  DHT11 (−) ──── − rail                        │
+    │                                               │
+    │  LCD VSS (pin 1) ──── − rail (GND)            │
+    │  LCD VDD (pin 2) ──── + rail (5V)             │
+    │  LCD V0  (pin 3) ──── Potentiometer wiper     │
+    │  LCD RW  (pin 5) ──── − rail (GND)            │
+    │  LCD A   (pin 15) ─── + rail via 220Ω         │
+    │  LCD K   (pin 16) ─── − rail (GND)            │
+    │                                               │
+    │  Potentiometer:                               │
+    │    Left leg  ──── + rail (5V)                  │
+    │    Right leg ──── − rail (GND)                 │
+    │    Middle leg ─── LCD V0 (pin 3)               │
     └──────────────────────────────────────────────┘
 ```
 
@@ -227,6 +264,72 @@ All components then tap power and ground from these rails. This keeps wiring cle
 4. Connect **−** (GND) to the breadboard **− rail**.
 
 > The Elegoo DHT11 module has a built-in 10KΩ pull-up resistor — no extra resistor needed.
+
+#### LCD1602 Display (4-bit parallel mode)
+
+The LCD1602 has **16 pins** along the top edge. We use 4-bit mode so only 6 GPIO wires are needed (RS, E, D4–D7). The rest are power, ground, and contrast.
+
+**LCD pin connections:**
+
+| LCD Pin | LCD Label | Connect To | Notes |
+|---------|-----------|-----------|-------|
+| 1 | VSS | Breadboard − rail | Ground |
+| 2 | VDD | Breadboard + rail | 5V Power |
+| 3 | V0 | Potentiometer wiper (middle leg) | Contrast adjustment |
+| 4 | RS | RPi Pin 37 (GPIO 26) | Register Select |
+| 5 | RW | Breadboard − rail | Ground = Write mode (always) |
+| 6 | E | RPi Pin 35 (GPIO 19) | Enable |
+| 7 | D0 | — | Not connected (4-bit mode) |
+| 8 | D1 | — | Not connected (4-bit mode) |
+| 9 | D2 | — | Not connected (4-bit mode) |
+| 10 | D3 | — | Not connected (4-bit mode) |
+| 11 | D4 | RPi Pin 33 (GPIO 13) | Data bit 4 |
+| 12 | D5 | RPi Pin 31 (GPIO 6) | Data bit 5 |
+| 13 | D6 | RPi Pin 29 (GPIO 5) | Data bit 6 |
+| 14 | D7 | RPi Pin 23 (GPIO 11) | Data bit 7 |
+| 15 | A | Breadboard + rail via 220Ω resistor | Backlight anode (+) |
+| 16 | K | Breadboard − rail | Backlight cathode (−) |
+
+> The 220Ω resistor on pin 15 (A) limits current to the backlight LED. Without it, you may damage the backlight.
+
+**Potentiometer wiring (for contrast adjustment):**
+
+| Potentiometer Pin | Connect To |
+|-------------------|-----------|
+| Left leg | Breadboard + rail (5V) |
+| Right leg | Breadboard − rail (GND) |
+| Middle leg (wiper) | LCD Pin 3 (V0) |
+
+**Step-by-step:**
+
+1. Place the LCD1602 on the breadboard (it spans many rows).
+2. Wire LCD **pin 1 (VSS)** to the breadboard **− rail**.
+3. Wire LCD **pin 2 (VDD)** to the breadboard **+ rail**.
+4. Place the **10KΩ potentiometer** on the breadboard.
+   - Left leg → **+ rail**, Right leg → **− rail**, Middle leg → LCD **pin 3 (V0)**.
+5. Wire LCD **pin 4 (RS)** to RPi **Pin 37 (GPIO 26)**.
+6. Wire LCD **pin 5 (RW)** to the breadboard **− rail** (ground = write mode).
+7. Wire LCD **pin 6 (E)** to RPi **Pin 35 (GPIO 19)**.
+8. Leave LCD pins 7–10 (D0–D3) **unconnected**.
+9. Wire LCD **pin 11 (D4)** to RPi **Pin 33 (GPIO 13)**.
+10. Wire LCD **pin 12 (D5)** to RPi **Pin 31 (GPIO 6)**.
+11. Wire LCD **pin 13 (D6)** to RPi **Pin 29 (GPIO 5)**.
+12. Wire LCD **pin 14 (D7)** to RPi **Pin 23 (GPIO 11)**.
+13. Wire a **220Ω resistor** from the breadboard **+ rail** to LCD **pin 15 (A)** (backlight power).
+14. Wire LCD **pin 16 (K)** to the breadboard **− rail**.
+
+> 💡 After powering on, slowly turn the potentiometer knob until you see solid rectangles on the top row of the LCD — that means contrast is set correctly.
+
+##### Testing the LCD
+
+After wiring, run the hardware test:
+
+```bash
+source .venv/bin/activate
+python3 src/test_lcd.py
+```
+
+You should see "Hello Room Guard!" on the first line and "LCD Working!" on the second. The test cycles through several text patterns. If the backlight is on but no text is visible, adjust the potentiometer. If the text looks garbled, double-check the D4–D7 data wires.
 
 ##### Testing the DHT11
 
@@ -386,6 +489,8 @@ Browser (phone/laptop)           Raspberry Pi
                                 │    ├── PIR sensor (GPIO 17)      │
                                 │    ├── LED (GPIO 27)             │
                                 │    ├── Buzzer (GPIO 22)          │
+                                │    ├── LCD 16×2 (GPIO 26,19,     │
+                                │    │   13,6,5,11)                 │
                                 │    └── Melody library (20 tunes) │
                                 └──────────────────────────────────┘
 ```
@@ -394,6 +499,7 @@ Browser (phone/laptop)           Raspberry Pi
 
 - **`src/web_app.py`** — Flask web application. Serves the dashboard HTML and a REST API for controlling the system. Binds to `0.0.0.0:5000`. Hardware initializes in a background thread so the dashboard is available immediately (PIR needs 40s to calibrate).
 - **`src/room_guard.py`** — `RoomGuard` class that manages all hardware (PIR, LED, buzzer) and application state (armed/disarmed, motion count, event log). Thread-safe — all state is protected with a lock since Flask serves from multiple threads and gpiozero callbacks run in their own thread. Can also run standalone as a CLI app (`python3 src/room_guard.py`).
+- **`src/lcd_display.py`** — LCD1602 driver using RPLCD in 4-bit GPIO mode. Provides `LCDDisplay` class with `write(line1, line2)` for updating text, `clear()`, and a change-detection cache that only rewrites lines when their content changes (reducing flicker). Truncates and pads text to 16 characters automatically.
 - **`src/buzzer.py`** — PWM buzzer driver with a full chromatic scale (C4–C6). Provides system melodies (startup, arm, disarm, sensor error) and the `Buzzer` class for playing tones and melodies.
 - **`src/melody_library.py`** — Library of 20 famous public-domain melodies. `get_random_melody()` returns a random melody for motion alerts.
 - **`src/templates/index.html`** — Single-page responsive dashboard. Dark theme, mobile-friendly, no CDN dependencies (works offline on local network). Auto-refreshes status (3s) and logs (5s) via `fetch` API.
@@ -495,4 +601,7 @@ ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
 | DHT11 reads are flaky | Normal — the DHT11 fails ~10-20% of reads. The sensor module retries automatically. |
 | Service won't start | Check `journalctl -u room_guard -e` for errors. Verify file paths in .service file. |
 | Dashboard won't load | Verify the service is running: `sudo systemctl status room_guard`. Check port 5000 is not blocked. Try `http://<Pi-IP>:5000` if hostname doesn't resolve. |
+| LCD backlight on but no text | Adjust the potentiometer slowly until text appears. The contrast must be tuned. |
+| LCD shows garbled/random characters | Double-check D4-D7 data wires match GPIO 13, 6, 5, 11 respectively. Verify RS (GPIO 26) and E (GPIO 19). |
+| LCD not lighting up at all | Check 220Ω resistor from + rail to LCD pin 15 (A). Verify VDD (pin 2) is on + rail and VSS (pin 1) on − rail. |
 | Dashboard shows "Disarmed" after boot | Normal — the PIR sensor needs ~40 seconds to calibrate, then it auto-arms. Refresh the page after a minute. |
