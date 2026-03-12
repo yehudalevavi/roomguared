@@ -120,6 +120,7 @@ The dashboard communicates via a REST API. You can also call these endpoints dir
 | POST | `/api/play/<name>` | Play a melody by name |
 | GET | `/api/melodies` | List all 20 available melody names |
 | GET | `/api/logs?limit=50` | Recent activity log entries (JSON) |
+| POST | `/api/lcd/message` | Show custom message on LCD for 10 seconds (JSON body: `{"line1":"…","line2":"…"}`) |
 
 ## Full Documentation
 

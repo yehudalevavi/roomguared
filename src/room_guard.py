@@ -220,6 +220,20 @@ class RoomGuard:
         except Exception:
             pass
 
+    def show_custom_message(self, line1: str, line2: str = "", duration: int = 10) -> None:
+        """Show a user-supplied message on the LCD for *duration* seconds,
+        then automatically return to the normal status cycle."""
+        self._lcd_flash_until = time.monotonic() + duration
+        try:
+            if self._lcd._lcd is not None:
+                with self._lcd_lock:
+                    self._lcd._line1 = ""
+                    self._lcd._line2 = ""
+                    self._lcd.write(line1, line2)
+        except Exception:
+            pass
+        self._log_message(f"LCD message: {line1}" + (f" / {line2}" if line2 else ""))
+
     def _lcd_flash(self, line1: str, line2: str = "") -> None:
         """Show a temporary message on the LCD for LCD_FLASH_DURATION seconds."""
         self._lcd_flash_until = time.monotonic() + LCD_FLASH_DURATION

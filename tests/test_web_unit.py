@@ -132,6 +132,38 @@ class TestWebApp(unittest.TestCase):
         d = json.loads(r.data)
         self.assertEqual(len(d["logs"]), 5)
 
+    def test_lcd_message_both_lines(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "Hello", "line2": "World"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertEqual(d["line1"], "Hello")
+        self.assertEqual(d["line2"], "World")
+
+    def test_lcd_message_line1_only(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "Just line 1"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_lcd_message_empty_rejected(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "", "line2": ""}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        d = json.loads(r.data)
+        self.assertFalse(d["ok"])
+
 
 class TestRoomGuardClass(unittest.TestCase):
     """Tests for the RoomGuard class logic (no hardware)."""
