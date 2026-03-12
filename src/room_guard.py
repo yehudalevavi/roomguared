@@ -234,63 +234,94 @@ class RoomGuard:
             pass
 
     def _lcd_cycle_loop(self) -> None:
-        """Background thread: cycle LCD between status pages."""
+        """Background thread: cycle LCD between status pages with scrolling."""
         page = 0
+        SCROLL_STEP_DELAY = 0.4   # seconds between scroll steps
+        SCROLL_PAUSE_STEPS = 4    # steps to pause at each end before reversing
+        TICKS_PER_PAGE = LCD_PAGE_INTERVAL * 2  # how many 0.5s ticks per page
+
         while self._lcd_running:
-            # If a flash message is active, don't overwrite it
             if time.monotonic() < self._lcd_flash_until:
                 time.sleep(0.5)
                 continue
 
-            now = datetime.now()
+            # Build page content (line1 can be long, line2 is live clock)
+            line1 = self._lcd_page_line1(page)
+            max_offset = max(0, len(line1) - 16)
+            offset = 0
+            direction = 1  # 1 = scrolling right (offset increasing), -1 = left
+            pause_counter = SCROLL_PAUSE_STEPS  # pause at start
 
-            if page == 0:
-                # Page 1: Status + current time
-                with self._lock:
-                    state = "ARMED" if self._armed else "DISARMED"
-                    if self._playing:
-                        state = "PLAYING"
-                line1 = f"Room Guard {state}"
-                line2 = now.strftime("%H:%M:%S %d/%m/%y")
-            elif page == 1:
-                # Page 2: Motion stats
-                with self._lock:
-                    count = self._motion_count
-                    last = self._last_event_time
-                last_short = last.split(" ")[1] if last else "None"
-                line1 = f"Motion count: {count}"
-                line2 = f"Last: {last_short}"
-            elif page == 2:
-                # Page 3: LED status + date
-                with self._lock:
-                    led = "ON" if self._led_on else "OFF"
-                line1 = f"LED: {led}"
-                line2 = now.strftime("%Y-%m-%d")
-            else:
-                line1, line2 = "", ""
-
-            # Use scrolling for long text, with stop checks
-            def should_stop():
-                return (not self._lcd_running or
-                        time.monotonic() < self._lcd_flash_until)
-
-            try:
-                if self._lcd._lcd is not None:
-                    with self._lcd_lock:
-                        self._lcd.scroll_text(
-                            line1, line2, check_stop=should_stop)
-            except Exception:
-                pass
-
-            # Hold the page for remaining time
-            for _ in range(LCD_PAGE_INTERVAL * 2):
-                if not self._lcd_running:
-                    return
+            page_start = time.monotonic()
+            while self._lcd_running and (time.monotonic() - page_start) < LCD_PAGE_INTERVAL:
                 if time.monotonic() < self._lcd_flash_until:
                     break
-                time.sleep(0.5)
+
+                # Refresh line1 content (status may change)
+                line1 = self._lcd_page_line1(page)
+                max_offset = max(0, len(line1) - 16)
+
+                # Live clock on line 2
+                line2 = self._lcd_page_line2(page)
+
+                try:
+                    if self._lcd._lcd is not None:
+                        with self._lcd_lock:
+                            self._lcd.write_at_offset(line1, 0, offset)
+                            self._lcd.write(line2=line2)
+                except Exception:
+                    pass
+
+                time.sleep(SCROLL_STEP_DELAY)
+
+                # Advance scroll position (bounce between ends)
+                if max_offset > 0:
+                    if pause_counter > 0:
+                        pause_counter -= 1
+                    else:
+                        offset += direction
+                        if offset >= max_offset:
+                            offset = max_offset
+                            direction = -1
+                            pause_counter = SCROLL_PAUSE_STEPS
+                        elif offset <= 0:
+                            offset = 0
+                            direction = 1
+                            pause_counter = SCROLL_PAUSE_STEPS
 
             page = (page + 1) % 3
+
+    def _lcd_page_line1(self, page: int) -> str:
+        """Return the top-line text for the given page."""
+        if page == 0:
+            with self._lock:
+                state = "ARMED" if self._armed else "DISARMED"
+                if self._playing:
+                    state = "PLAYING"
+            return f"Room Guard {state}"
+        elif page == 1:
+            with self._lock:
+                count = self._motion_count
+            return f"Motion count: {count}"
+        elif page == 2:
+            with self._lock:
+                led = "ON" if self._led_on else "OFF"
+            return f"LED: {led}"
+        return ""
+
+    def _lcd_page_line2(self, page: int) -> str:
+        """Return the bottom-line text for the given page (live clock)."""
+        now = datetime.now()
+        if page == 0:
+            return now.strftime("%H:%M:%S %d/%m/%y")
+        elif page == 1:
+            with self._lock:
+                last = self._last_event_time
+            last_short = last.split(" ")[1] if last else "None"
+            return f"Last: {last_short}"
+        elif page == 2:
+            return now.strftime("%H:%M:%S %d/%m/%y")
+        return ""
 
 
 # --- Standalone CLI mode ---
