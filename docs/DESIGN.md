@@ -448,6 +448,8 @@ Press **Ctrl+C** to stop (plays a descending disarm melody).
 
 The systemd service runs the **web dashboard** (`web_app.py`), which includes all Room Guard functionality and makes the dashboard available at `http://room-guard:5000` on boot.
 
+The service also **auto-updates** on every start — it runs `git pull` and `pip install` before launching the app, so the Pi always runs the latest code from GitHub. If the network is unavailable, the update is skipped gracefully and the app starts with the existing code.
+
 ### Install the systemd service
 
 ```bash
@@ -456,6 +458,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable room_guard
 sudo systemctl start room_guard
 ```
+
+### Deploy new code (no SSH needed)
+
+Just push to the `master` branch on GitHub, then reboot the Pi or run:
+
+```bash
+sudo systemctl restart room_guard
+```
+
+The service will pull the latest code and restart the app automatically.
 
 ### Check status
 

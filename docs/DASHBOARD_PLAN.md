@@ -360,6 +360,42 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 > All component VCC/GND pins connect to the breadboard power rails, not directly to RPi pins.
 
+## Auto-Update on Service Start
+
+**Status: ✅ Complete**
+
+**Goal:** Ensure the Raspberry Pi always runs the latest firmware by pulling code updates automatically before the application starts.
+
+**Why:** Without this, deploying new features or fixes requires SSH access to the Pi and manually running `git pull`. With auto-update, you just push to the `master` branch and the Pi picks up the changes on its next reboot or service restart — no manual intervention needed.
+
+**New wiring:** None — software only.
+
+**How it works:**
+
+The systemd service (`config/room_guard.service`) uses `ExecStartPre` directives to run two commands before launching the app:
+
+1. `git pull origin master` — fetches and applies the latest code from GitHub
+2. `pip install -r requirements.txt` — installs any new or updated dependencies
+
+Both commands use the `-` prefix, which tells systemd to **continue even if they fail** (e.g., no network on boot). This means:
+- ✅ If the Pi has internet → it updates to the latest code, then starts
+- ✅ If the Pi has no internet → it skips the update and starts with the existing code
+
+The service also waits for `network-online.target` so the network has the best chance of being ready before the pull.
+
+**To deploy new code to the Pi:**
+1. Push your changes to `master` on GitHub
+2. Either reboot the Pi or run `sudo systemctl restart room_guard`
+3. The service pulls the latest code and restarts the app automatically
+
+**Validation:**
+- ✅ Service starts normally when network is available (pulls latest code)
+- ✅ Service starts normally when network is unavailable (skips pull gracefully)
+- ✅ New dependencies in `requirements.txt` are installed automatically
+- ✅ Existing Room Guard functionality is unaffected
+
+---
+
 ## New Dependencies
 
 ```

@@ -1,12 +1,15 @@
 [Unit]
 Description=Room Guard — Motion Detection Alarm
-After=multi-user.target
+After=multi-user.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=yehudalevavi
 WorkingDirectory=/home/yehudalevavi/rpiProject
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=-/usr/bin/git -C /home/yehudalevavi/rpiProject pull origin master
+ExecStartPre=-/home/yehudalevavi/rpiProject/.venv/bin/pip3 install --quiet -r /home/yehudalevavi/rpiProject/requirements.txt
 ExecStart=/home/yehudalevavi/rpiProject/.venv/bin/python3 /home/yehudalevavi/rpiProject/src/web_app.py
 Restart=on-failure
 RestartSec=5

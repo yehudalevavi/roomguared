@@ -83,6 +83,8 @@ sudo systemctl start room_guard
 
 The web dashboard will start automatically on boot and be available at `http://room-guard:5000`.
 
+> **Auto-update:** On every start (including reboot), the service automatically runs `git pull` and `pip install` to fetch the latest code and dependencies. If the network is unavailable, the service starts normally with the existing code.
+
 ## Project Structure
 
 ```
