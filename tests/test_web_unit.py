@@ -164,6 +164,43 @@ class TestWebApp(unittest.TestCase):
         d = json.loads(r.data)
         self.assertFalse(d["ok"])
 
+    def test_lcd_message_rejects_unicode(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "שלום עולם", "line2": ""}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+        d = json.loads(r.data)
+        self.assertFalse(d["ok"])
+        self.assertIn("Unsupported", d["error"])
+
+    def test_lcd_message_rejects_emoji(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "Hello 🎵"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_lcd_message_rejects_control_chars(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "line1\nline2"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_lcd_message_truncates_long_lines(self):
+        r = self.client.post(
+            "/api/lcd/message",
+            data=json.dumps({"line1": "ABCDEFGHIJKLMNOPQRST"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertEqual(len(d["line1"]), 16)
+
 
 class TestRoomGuardClass(unittest.TestCase):
     """Tests for the RoomGuard class logic (no hardware)."""

@@ -281,6 +281,35 @@ class TestLCDPad(unittest.TestCase):
         self.assertEqual(len(result), 20)
 
 
+class TestLCDSanitize(unittest.TestCase):
+    """Tests for the sanitize class method."""
+
+    def test_ascii_printable_unchanged(self):
+        self.assertEqual(LCDDisplay.sanitize("Hello World!"), "Hello World!")
+
+    def test_all_printable_ascii_pass(self):
+        text = "".join(chr(c) for c in range(0x20, 0x7F))
+        self.assertEqual(LCDDisplay.sanitize(text), text)
+
+    def test_strips_unicode(self):
+        self.assertEqual(LCDDisplay.sanitize("שלום"), "")
+
+    def test_strips_emoji(self):
+        self.assertEqual(LCDDisplay.sanitize("Hi 🎵 there"), "Hi  there")
+
+    def test_strips_newline(self):
+        self.assertEqual(LCDDisplay.sanitize("line1\nline2"), "line1line2")
+
+    def test_strips_tab(self):
+        self.assertEqual(LCDDisplay.sanitize("col1\tcol2"), "col1col2")
+
+    def test_empty_string(self):
+        self.assertEqual(LCDDisplay.sanitize(""), "")
+
+    def test_mixed_valid_invalid(self):
+        self.assertEqual(LCDDisplay.sanitize("ABC€DEF"), "ABCDEF")
+
+
 class TestLCDLineProperties(unittest.TestCase):
     """Tests for line1/line2 read-only properties."""
 

@@ -98,8 +98,12 @@ def api_lcd_message():
     line2 = data.get("line2", "")
     if not line1 and not line2:
         return jsonify({"ok": False, "error": "Provide at least line1 or line2"}), 400
-    guard.show_custom_message(line1, line2)
-    return jsonify({"ok": True, "line1": line1, "line2": line2})
+    # Validate: only ASCII printable characters (HD44780 LCD)
+    from lcd_display import LCDDisplay
+    if line1 != LCDDisplay.sanitize(line1) or line2 != LCDDisplay.sanitize(line2):
+        return jsonify({"ok": False, "error": "Unsupported characters. Use ASCII only (A-Z, 0-9, symbols)."}), 400
+    guard.show_custom_message(line1[:16], line2[:16])
+    return jsonify({"ok": True, "line1": line1[:16], "line2": line2[:16]})
 
 
 # --- Startup ---

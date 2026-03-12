@@ -117,6 +117,17 @@ class LCDDisplay:
         """Return the current text on line 2."""
         return self._line2.rstrip()
 
+    # ASCII printable range supported by the HD44780 controller
+    _LCD_SAFE_RANGE = range(0x20, 0x7F)  # space … tilde
+
+    @classmethod
+    def sanitize(cls, text: str) -> str:
+        """Strip characters unsupported by the HD44780 LCD controller.
+
+        Keeps only ASCII printable characters (0x20–0x7E).
+        """
+        return "".join(c for c in text if ord(c) in cls._LCD_SAFE_RANGE)
+
     def _pad(self, text: str) -> str:
         """Truncate to LCD width and pad with spaces to overwrite old text."""
         return text[:self.cols].ljust(self.cols)
