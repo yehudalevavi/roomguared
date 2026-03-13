@@ -1,6 +1,6 @@
 # 🌡️ Smart Room Dashboard — Implementation Plan
 
-> Evolving the Room Guard into a room monitoring station with temperature, humidity, LCD display, RTC clock, and data logging.
+> Evolving the Room Guard into a room monitoring station with temperature, humidity, LCD display, IR remote control, and data logging.
 
 ## Approach
 
@@ -268,30 +268,91 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
-## Phase 6: DS1307 RTC Module (Real-Time Clock)
+## Phase 6: IR Remote Control
 
-**Goal:** Get accurate timestamps even without internet.
+**Status: 🔲 Not started**
 
-**New wiring (2 wires — power from breadboard rails):**
+**Goal:** Use an IR receiver and remote control to physically control the Room Guard — arm/disarm the alarm, navigate and play melodies, and more.
+
+**Why:** The web dashboard is great for phones and laptops, but sometimes you just want to grab a remote and press a button. An IR remote gives instant physical control without needing a network connection or a browser — perfect for a bedside alarm or a quick "shut up!" when a melody is playing.
+
+**New wiring (1 data wire — power from breadboard rails):**
 
 | Wire | From | To |
 |------|------|----|
-| VCC (red) | DS1307 VCC | Breadboard + rail |
-| GND (black) | DS1307 GND | Breadboard − rail |
-| SDA (blue) | DS1307 SDA | RPi Pin 3 (GPIO 2 / SDA1) |
-| SCL (yellow) | DS1307 SCL | RPi Pin 5 (GPIO 3 / SCL1) |
+| VCC (red) | IR receiver VCC | RPi Pin 1 (3.3V) |
+| Signal (yellow) | IR receiver Signal | RPi Pin 12 (GPIO 18) |
+| GND (black) | IR receiver GND | Breadboard − rail |
 
-> ⚠️ Must enable I2C on the Raspberry Pi first (see software steps).
+> The IR receiver module (e.g., VS1838B from the Elegoo kit) has 3 pins: Signal, VCC, and GND. Orient the rounded dome side toward the remote. Some modules have the pins labeled; if not, check the datasheet — pin order varies by module.
+>
+> ⚠️ **Power the IR receiver from 3.3V, not 5V.** The signal pin connects directly to a GPIO pin, and RPi GPIOs are 3.3V only. Powering from 5V could send 5V into the GPIO and damage the Pi. The VS1838B works fine at 3.3V (rated 2.7–5.5V).
+
+**System setup:**
+- Enable the `gpio-ir-recv` kernel overlay by adding to `/boot/config.txt`:
+  ```
+  dtoverlay=gpio-ir,gpio_pin=18
+  ```
+- Reboot the Pi for the overlay to take effect
+- Install `ir-keytable` for scanning and configuring key mappings:
+  ```bash
+  sudo apt install -y ir-keytable
+  ```
+- Verify the IR device is detected:
+  ```bash
+  ir-keytable
+  ```
+  Should show an `rc` device using the `gpio_ir_recv` driver.
 
 **Software:**
-- Enable I2C: `sudo raspi-config` → Interface Options → I2C → Enable
-- Install `i2c-tools` and verify: `sudo i2cdetect -y 1` (should show device at address `0x68`)
-- Create `src/test_rtc.py` — sets the RTC time from system clock, then reads it back every second for 10 seconds
+- Create `src/ir_remote.py` — IR remote handler module:
+  - `IRRemote` class that listens for IR key events via `evdev`
+  - Configurable button-to-action mapping (easy to remap for different remotes)
+  - Runs in a background thread, dispatches actions to the `RoomGuard` instance
+- Create `src/test_ir.py` — hardware test that prints received button names/codes (useful for mapping a new remote)
+- Create `tests/test_ir_unit.py` — unit tests for button mapping and dispatch logic
+- Add `evdev` to `requirements.txt`
+
+**Button mapping (default — configurable):**
+
+| Remote Button | Action | Sound Cue |
+|---------------|--------|-----------|
+| ⏮ Prev (\ |<<) | Select previous melody in library | Short low beep |
+| ⏯ Play/Pause (>\ |\ |) | Play selected melody / stop if playing | — |
+| ⏭ Next (>>\ |) | Select next melody in library | Short high beep |
+| 🔴 Red button | Toggle arm / disarm | `MELODY_ARM` or `MELODY_DISARM` jingle |
+
+> The "current melody" selection wraps around: pressing Next on the last melody goes back to the first, and Prev on the first goes to the last. The LCD shows the currently selected melody name when navigating with Prev/Next.
+
+**Suggested future button mappings:**
+
+| Remote Button | Potential Action |
+|---------------|-----------------|
+| 0 | Play a random melody |
+| 1–9 | Quick-play melody by number |
+| CH−/CH/CH+ | Cycle LCD display pages |
+| EQ | Toggle LED on/off |
+| +/− | Adjust motion cooldown time |
+| Power | Graceful Pi shutdown (long-press for safety) |
+
+**Integration with Room Guard:**
+- `RoomGuard` gains new methods:
+  - `next_melody()` — advance the internal melody index, return the name
+  - `prev_melody()` — go back one melody, return the name
+  - `play_current_melody()` — play the currently selected melody
+  - `stop_melody()` — interrupt a playing melody (sets a cancel flag checked in the play loop)
+  - `toggle_arm()` — arm if disarmed, disarm if armed, with `MELODY_ARM` / `MELODY_DISARM` sound cue
+- Arm/disarm via remote plays the existing system melodies (`MELODY_ARM` and `MELODY_DISARM` from `buzzer.py`) that were defined but previously unused
+- Web API gains matching endpoints: `POST /api/play/next`, `POST /api/play/prev`, `POST /api/toggle-arm`
 
 **Validation:**
-- ✅ `i2cdetect` shows a device at address `0x68`
-- ✅ RTC time matches system time (within 1-2 seconds)
-- ✅ After unplugging RPi and repowering, RTC still keeps time (if battery is inserted)
+- ✅ `test_ir.py` prints button codes when remote buttons are pressed
+- ✅ Prev/Next cycle through all 20 melodies (wraps around)
+- ✅ Play/Pause starts and stops melody playback
+- ✅ Red button arms/disarms with audible jingle confirmation
+- ✅ LCD shows selected melody name during navigation
+- ✅ IR remote works simultaneously with the web dashboard (no conflicts)
+- ✅ Unit tests pass without hardware
 
 ---
 
@@ -306,7 +367,8 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
   - Page 1: `Temp: 23.0C` / `Humidity: 45%`
   - Page 2: `Motion: 7 today` / `Last: 14:23:05`
   - Page 3: `Room Guard ON` / `<current date/time>`
-- Motion events are timestamped using the RTC
+- Motion events are timestamped using the system clock (NTP-synced when online)
+- IR remote provides physical controls alongside the web dashboard
 - Motion events are logged to `~/rpiProject/logs/events.csv`:
   ```
   datetime,temperature,humidity,event
@@ -349,14 +411,13 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | LED | GPIO 27 | Pin 13 | OUTPUT |
 | Buzzer (passive) | GPIO 22 | Pin 15 | PWM OUTPUT |
 | DHT11 Data | GPIO 4 | Pin 7 | INPUT |
+| IR Receiver | GPIO 18 | Pin 12 | INPUT |
 | LCD RS | GPIO 26 | Pin 37 | OUTPUT |
 | LCD E | GPIO 19 | Pin 35 | OUTPUT |
 | LCD D4 | GPIO 13 | Pin 33 | OUTPUT |
 | LCD D5 | GPIO 6 | Pin 31 | OUTPUT |
 | LCD D6 | GPIO 5 | Pin 29 | OUTPUT |
 | LCD D7 | GPIO 11 | Pin 23 | OUTPUT |
-| RTC SDA | GPIO 2 | Pin 3 | I2C |
-| RTC SCL | GPIO 3 | Pin 5 | I2C |
 
 > All component VCC/GND pins connect to the breadboard power rails, not directly to RPi pins.
 
@@ -402,5 +463,5 @@ The service also waits for `network-online.target` so the network has the best c
 gpiozero>=2.0
 adafruit-circuitpython-dht
 RPLCD
-smbus2
+evdev
 ```

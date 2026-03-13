@@ -45,6 +45,8 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 | 9 | 10KΩ potentiometer     | 1   | ~$0.50      | For LCD contrast adjustment             |
 | 10 | Breadboard             | 1   | ~$3         | Half-size or full-size                  |
 | 11 | Jumper wires (Male-to-Female) | ~20 | ~$2  | For connecting RPi GPIO to breadboard  |
+| 12 | IR receiver (VS1838B)  | 1   | ~$1         | 3-pin: Signal, VCC, GND (from Elegoo kit) |
+| 13 | IR remote control      | 1   | —           | NEC protocol remote (from Elegoo kit or any NEC remote) |
 
 ---
 
@@ -156,6 +158,7 @@ All components then tap power and ground from these rails. This keeps wiring cle
 | LED (+) via 220Ω | GPIO 27   | Pin 13      | OUTPUT    |
 | Buzzer (+)       | GPIO 22   | Pin 15      | PWM OUTPUT |
 | DHT11 DATA       | GPIO 4    | Pin 7       | INPUT     |
+| IR Receiver      | GPIO 18   | Pin 12      | INPUT     |
 | LCD RS           | GPIO 26   | Pin 37      | OUTPUT    |
 | LCD E            | GPIO 19   | Pin 35      | OUTPUT    |
 | LCD D4           | GPIO 13   | Pin 33      | OUTPUT    |
@@ -179,6 +182,7 @@ All components then tap power and ground from these rails. This keeps wiring cle
     GND  (9) (10) GPIO15
          ┌──────────────────────────────── PIR OUT (yellow wire)
   GPIO17 (11)(12) GPIO18
+                  └─────────────────────── IR Receiver Signal (yellow wire)
          ┌──────────────────────────────── LED Anode (+) via 220Ω resistor
   GPIO27 (13)(14) GND
          ┌──────────────────────────────── Buzzer (+)
@@ -217,6 +221,9 @@ All components then tap power and ground from these rails. This keeps wiring cle
     │                                               │
     │  DHT11 (+) ──── + rail                        │
     │  DHT11 (−) ──── − rail                        │
+    │                                               │
+    │  IR Receiver VCC ── RPi Pin 1 (3.3V)            │
+    │  IR Receiver GND ── − rail                     │
     │                                               │
     │  LCD VSS (pin 1) ──── − rail (GND)            │
     │  LCD VDD (pin 2) ──── + rail (5V)             │
@@ -264,6 +271,14 @@ All components then tap power and ground from these rails. This keeps wiring cle
 4. Connect **−** (GND) to the breadboard **− rail**.
 
 > The Elegoo DHT11 module has a built-in 10KΩ pull-up resistor — no extra resistor needed.
+
+#### IR Receiver (VS1838B)
+1. The IR receiver module has 3 pins. With the dome (rounded side) facing you: **Signal** (left), **GND** (middle), **VCC** (right). ⚠️ Pin order varies by module — check the labels or datasheet.
+2. Connect **VCC** to RPi **Pin 1 (3.3V)** — **not** the 5V breadboard rail (see warning below).
+3. Connect **Signal** to **Pin 12 (GPIO 18)** using a yellow/green jumper wire.
+4. Connect **GND** to the breadboard **− rail**.
+
+> ⚠️ **Power the IR receiver from 3.3V, not 5V.** The signal pin connects directly to GPIO 18, and RPi GPIOs are 3.3V only. The VS1838B works fine at 3.3V (rated 2.7–5.5V). Powering from 5V would risk sending 5V into the GPIO pin and damaging the Pi.
 
 #### LCD1602 Display (4-bit parallel mode)
 
@@ -498,10 +513,11 @@ Browser (phone/laptop)           Raspberry Pi
 │  index.html  │   local net    │         │                        │
 └──────────────┘                │   RoomGuard class                │
                                 │   (room_guard.py)                │
-                                │    ├── PIR sensor (GPIO 17)      │
-                                │    ├── LED (GPIO 27)             │
-                                │    ├── Buzzer (GPIO 22)          │
-                                │    ├── LCD 16×2 (GPIO 26,19,     │
+IR Remote Control               │    ├── PIR sensor (GPIO 17)      │
+┌──────────────┐     IR signal  │    ├── LED (GPIO 27)             │
+│  🎮 Remote   │───────────────►│    ├── Buzzer (GPIO 22)          │
+│   (NEC)      │   GPIO 18     │    ├── IR receiver (GPIO 18)     │
+└──────────────┘                │    ├── LCD 16×2 (GPIO 26,19,     │
                                 │    │   13,6,5,11)                 │
                                 │    └── Melody library (20 tunes) │
                                 └──────────────────────────────────┘
@@ -514,6 +530,7 @@ Browser (phone/laptop)           Raspberry Pi
 - **`src/lcd_display.py`** — LCD1602 driver using RPLCD in 4-bit GPIO mode. Provides `LCDDisplay` class with `write(line1, line2)` for updating text, `clear()`, and a change-detection cache that only rewrites lines when their content changes (reducing flicker). Truncates and pads text to 16 characters automatically.
 - **`src/buzzer.py`** — PWM buzzer driver with a full chromatic scale (C4–C6). Provides system melodies (startup, arm, disarm, sensor error) and the `Buzzer` class for playing tones and melodies.
 - **`src/melody_library.py`** — Library of 20 famous public-domain melodies. `get_random_melody()` returns a random melody for motion alerts.
+- **`src/ir_remote.py`** — IR remote control handler using Linux `gpio-ir-recv` overlay and `evdev`. Listens for NEC remote keypresses in a background thread and dispatches actions (prev/play-pause/next melody, arm/disarm) to the `RoomGuard` instance. Button mapping is configurable.
 - **`src/templates/index.html`** — Single-page responsive dashboard. Dark theme, mobile-friendly, no CDN dependencies (works offline on local network). Auto-refreshes status (3s) and logs (5s) via `fetch` API.
 
 ### Web Dashboard
@@ -617,3 +634,6 @@ ssh yehudalevavi@room-guard "journalctl -u room_guard -f"
 | LCD shows garbled/random characters | Double-check D4-D7 data wires match GPIO 13, 6, 5, 11 respectively. Verify RS (GPIO 26) and E (GPIO 19). |
 | LCD not lighting up at all | Check 220Ω resistor from + rail to LCD pin 15 (A). Verify VDD (pin 2) is on + rail and VSS (pin 1) on − rail. |
 | Dashboard shows "Disarmed" after boot | Normal — the PIR sensor needs ~40 seconds to calibrate, then it auto-arms. Refresh the page after a minute. |
+| IR remote not responding | Verify `dtoverlay=gpio-ir,gpio_pin=18` is in `/boot/config.txt` and you've rebooted. Run `ir-keytable` to check the device is detected. |
+| IR receiver picks up no signals | Check wiring — Signal pin to GPIO 18, VCC to 5V, GND to GND. Point the remote directly at the receiver dome. Try `ir-keytable -t` to watch for raw events. |
+| IR buttons trigger wrong actions | Run `src/test_ir.py` to see the key codes your remote sends, then update the button mapping in `ir_remote.py`. |

@@ -10,6 +10,16 @@ When someone walks into the room, the **Room Guard** detects their movement and:
 
 Each motion event plays a different melody — Mozart, Beethoven, Jingle Bells, and more. The melody name is logged so you can see which one played. After a cooldown, it watches for the next intruder! 🕵️
 
+### 🎮 IR Remote Control
+
+Grab the remote and control the Room Guard from across the room:
+
+- **⏮ / ⏭ Prev / Next** — browse through all 20 melodies
+- **⏯ Play/Pause** — play the selected melody or stop the current one
+- **🔴 Red button** — arm or disarm the alarm (with a confirmation jingle)
+
+No phone, no laptop, no SSH — just point and press. The IR remote works alongside the web dashboard, so you can use whichever is more convenient.
+
 ### 🌐 Web Dashboard
 
 Control everything from your phone or laptop at **`http://room-guard:5000`**:
@@ -28,6 +38,7 @@ No app install needed — just open a browser on any device on your local networ
 - HC-SR501 PIR motion sensor
 - LED + 220Ω resistor
 - Passive buzzer (no white sticker on top — unlike the active buzzer)
+- IR receiver module (VS1838B) + IR remote control
 - Breadboard + jumper wires
 - microSD card (16GB+)
 
@@ -93,15 +104,18 @@ src/
 ├── room_guard.py        # Core logic — RoomGuard class (PIR, LED, buzzer)
 ├── buzzer.py            # Passive buzzer PWM driver + system melodies
 ├── melody_library.py    # 20 famous melodies for random motion alerts
+├── ir_remote.py         # IR remote control handler (Phase 6 — planned)
 ├── templates/
 │   └── index.html       # Web dashboard — dark-themed, responsive, no CDN
 ├── dht11_sensor.py      # DHT11 temperature sensor module (pending hardware)
 ├── test_outputs.py      # Hardware test: LED on/off
 ├── test_buzzer.py       # Hardware test: plays melodies on the buzzer
+├── test_ir.py           # Hardware test: prints IR remote button codes (Phase 6 — planned)
 └── test_dht11.py        # Hardware test: DHT11 sensor readings
 tests/
 ├── test_buzzer_unit.py  # Unit tests for buzzer + melody library (no Pi needed)
 ├── test_web_unit.py     # Unit tests for web app + RoomGuard class (no Pi needed)
+├── test_ir_unit.py      # Unit tests for IR remote handler (Phase 6 — planned)
 └── test_dht11_unit.py   # Unit tests for DHT11 sensor (no Pi needed)
 config/
 └── room_guard.service   # systemd service file (runs web_app.py)
@@ -128,7 +142,7 @@ The dashboard communicates via a REST API. You can also call these endpoints dir
 
 📖 See **[docs/DESIGN.md](docs/DESIGN.md)** for the complete design document including wiring diagrams, architecture, and troubleshooting.
 
-📋 See **[docs/DASHBOARD_PLAN.md](docs/DASHBOARD_PLAN.md)** for the roadmap to add more components (LCD display, RTC clock, data logging).
+📋 See **[docs/DASHBOARD_PLAN.md](docs/DASHBOARD_PLAN.md)** for the roadmap to add more components (LCD display, IR remote control, data logging).
 
 ## License
 
