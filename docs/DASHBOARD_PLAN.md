@@ -270,7 +270,9 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ## Phase 6: IR Remote Control
 
-**Status: 🔲 Not started**
+**Status: ✅ Complete**
+
+> The IR receiver module, unit tests, and hardware tests are implemented, deployed, and tested on the Pi. The remote controls arm/disarm, melody navigation, and play/stop — working alongside the web dashboard.
 
 **Goal:** Use an IR receiver and remote control to physically control the Room Guard — arm/disarm the alarm, navigate and play melodies, and more.
 
@@ -304,14 +306,24 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
   ```
   Should show an `rc` device using the `gpio_ir_recv` driver.
 
-**Software:**
-- Create `src/ir_remote.py` — IR remote handler module:
-  - `IRRemote` class that listens for IR key events via `evdev`
-  - Configurable button-to-action mapping (easy to remap for different remotes)
-  - Runs in a background thread, dispatches actions to the `RoomGuard` instance
-- Create `src/test_ir.py` — hardware test that prints received button names/codes (useful for mapping a new remote)
-- Create `tests/test_ir_unit.py` — unit tests for button mapping and dispatch logic
-- Add `evdev` to `requirements.txt`
+**Software (done ✅):**
+- `src/ir_remote.py` — IR remote handler module:
+  - `IRRemote` class that listens for IR scancode events via `evdev`
+  - Configurable scancode-to-action mapping (easy to remap for different remotes)
+  - 1000ms debounce to suppress NEC protocol repeat codes
+  - Runs in a background daemon thread, dispatches actions to the `RoomGuard` instance
+- `src/test_ir.py` — hardware test that prints received scancodes/keycodes (useful for mapping a new remote)
+- `tests/test_ir_unit.py` — 21 unit tests for config, dispatch, lifecycle, and debounce logic
+- Added `evdev>=1.7` to `requirements.txt`
+- Added `RoomGuard` methods: `next_melody()`, `prev_melody()`, `play_current_melody()`, `stop_melody()`, `toggle_arm()`
+- Added web API endpoints: `POST /api/melody/next`, `POST /api/melody/prev`, `POST /api/melody/play`, `POST /api/melody/stop`, `POST /api/toggle-arm`
+- Added buzzer cancel mechanism (`threading.Event`) for stopping melodies mid-playback
+- IR remote auto-starts with the web app and room guard CLI
+
+**Pi configuration (done ✅):**
+- `/boot/firmware/config.txt`: `dtoverlay=gpio-ir,gpio_pin=18`
+- `/etc/udev/rules.d/99-ir-nec.rules`: Persists NEC protocol across reboots
+- NEC protocol must be enabled: `sudo ir-keytable -p nec -s rc0`
 
 **Button mapping (default — configurable):**
 
@@ -335,7 +347,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | +/− | Adjust motion cooldown time |
 | Power | Graceful Pi shutdown (long-press for safety) |
 
-**Integration with Room Guard:**
+**Integration with Room Guard (done ✅):**
 - `RoomGuard` gains new methods:
   - `next_melody()` — advance the internal melody index, return the name
   - `prev_melody()` — go back one melody, return the name

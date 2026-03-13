@@ -104,18 +104,18 @@ src/
 ├── room_guard.py        # Core logic — RoomGuard class (PIR, LED, buzzer)
 ├── buzzer.py            # Passive buzzer PWM driver + system melodies
 ├── melody_library.py    # 20 famous melodies for random motion alerts
-├── ir_remote.py         # IR remote control handler (Phase 6 — planned)
+├── ir_remote.py         # IR remote control handler (NEC protocol via evdev)
 ├── templates/
 │   └── index.html       # Web dashboard — dark-themed, responsive, no CDN
 ├── dht11_sensor.py      # DHT11 temperature sensor module (pending hardware)
 ├── test_outputs.py      # Hardware test: LED on/off
 ├── test_buzzer.py       # Hardware test: plays melodies on the buzzer
-├── test_ir.py           # Hardware test: prints IR remote button codes (Phase 6 — planned)
+├── test_ir.py           # Hardware test: prints IR remote button codes
 └── test_dht11.py        # Hardware test: DHT11 sensor readings
 tests/
 ├── test_buzzer_unit.py  # Unit tests for buzzer + melody library (no Pi needed)
 ├── test_web_unit.py     # Unit tests for web app + RoomGuard class (no Pi needed)
-├── test_ir_unit.py      # Unit tests for IR remote handler (Phase 6 — planned)
+├── test_ir_unit.py      # Unit tests for IR remote handler (no Pi needed)
 └── test_dht11_unit.py   # Unit tests for DHT11 sensor (no Pi needed)
 config/
 └── room_guard.service   # systemd service file (runs web_app.py)
@@ -134,6 +134,11 @@ The dashboard communicates via a REST API. You can also call these endpoints dir
 | POST | `/api/led/on` | Turn LED on |
 | POST | `/api/led/off` | Turn LED off |
 | POST | `/api/play/<name>` | Play a melody by name |
+| POST | `/api/melody/next` | Select next melody |
+| POST | `/api/melody/prev` | Select previous melody |
+| POST | `/api/melody/play` | Play current melody |
+| POST | `/api/melody/stop` | Stop playing melody |
+| POST | `/api/toggle-arm` | Toggle arm/disarm with sound cue |
 | GET | `/api/melodies` | List all 20 available melody names |
 | GET | `/api/logs?limit=50` | Recent activity log entries (JSON) |
 | POST | `/api/lcd/message` | Show custom message on LCD for 10 seconds (JSON body: `{"line1":"…","line2":"…"}`) |
