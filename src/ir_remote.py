@@ -20,8 +20,10 @@ Wiring:
 """
 
 import threading
+import time
 
 IR_PIN = 18  # GPIO 18 (Physical pin 12) — default for gpio-ir overlay
+DEBOUNCE_MS = 350  # Ignore repeated scancodes within this window
 
 # Default scancode-to-action mapping for the Elegoo NEC remote.
 # Run `python3 src/test_ir.py` to discover your remote's actual scancodes.
@@ -48,6 +50,8 @@ class IRRemote:
         self._device = None
         self._running = False
         self._thread = None
+        self._last_scancode = None
+        self._last_time = 0.0
 
     def start(self) -> None:
         """Find the IR input device and start the listener thread."""
@@ -93,7 +97,17 @@ class IRRemote:
                 # (independent of ir-keytable keymap configuration)
                 if (event.type == evdev.ecodes.EV_MSC
                         and event.code == evdev.ecodes.MSC_SCAN):
-                    action = self._scancode_map.get(event.value)
+                    now = time.monotonic()
+                    scancode = event.value
+                    # Debounce: NEC protocol fires the scancode twice per
+                    # button press (initial + repeat). Ignore duplicates
+                    # within the debounce window.
+                    if (scancode == self._last_scancode
+                            and (now - self._last_time) < DEBOUNCE_MS / 1000):
+                        continue
+                    self._last_scancode = scancode
+                    self._last_time = now
+                    action = self._scancode_map.get(scancode)
                     if action:
                         self._dispatch(action)
         except OSError:

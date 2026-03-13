@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 sys.modules["gpiozero"] = MagicMock()
 
 sys.path.insert(0, "src")
-from ir_remote import IRRemote, ELEGOO_SCANCODE_MAP, IR_PIN
+from ir_remote import IRRemote, ELEGOO_SCANCODE_MAP, IR_PIN, DEBOUNCE_MS
 
 
 class TestIRConfig(unittest.TestCase):
@@ -69,6 +69,9 @@ class TestIRRemoteInit(unittest.TestCase):
         self.assertFalse(ir._running)
         self.assertIsNone(ir._device)
         self.assertIsNone(ir._thread)
+
+    def test_debounce_ms_is_positive(self):
+        self.assertGreater(DEBOUNCE_MS, 0)
 
 
 class TestIRRemoteDispatch(unittest.TestCase):
