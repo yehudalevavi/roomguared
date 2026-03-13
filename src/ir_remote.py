@@ -23,7 +23,7 @@ import threading
 import time
 
 IR_PIN = 18  # GPIO 18 (Physical pin 12) — default for gpio-ir overlay
-DEBOUNCE_MS = 2000  # Ignore repeated scancodes within this window
+DEBOUNCE_MS = 1000  # Ignore repeated scancodes within this window
 
 # Default scancode-to-action mapping for the Elegoo NEC remote.
 # Run `python3 src/test_ir.py` to discover your remote's actual scancodes.
