@@ -1,5 +1,9 @@
 # Copilot Instructions — Room Guard
 
+## Development Roadmap
+
+Feature development follows **[docs/DASHBOARD_PLAN.md](../docs/DASHBOARD_PLAN.md)**. When implementing a feature, refer to its description there for wiring, architecture, and acceptance criteria. If a new feature is not yet described in the plan, add it there before implementing.
+
 ## Build & Run
 
 ```bash
