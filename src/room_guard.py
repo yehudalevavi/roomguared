@@ -12,7 +12,7 @@ import sys
 import time
 from datetime import datetime
 
-from buzzer import Buzzer, MELODY_STARTUP, MELODY_DISARM, melody_duration
+from buzzer import Buzzer, MELODY_STARTUP, MELODY_ARM, MELODY_DISARM, NOTE_C4, NOTE_C5, melody_duration
 from melody_library import MOTION_MELODIES, get_random_melody
 from lcd_display import LCDDisplay
 
@@ -46,6 +46,7 @@ class RoomGuard:
         self._motion_count = 0
         self._last_event_time: str | None = None
         self._started_at: str | None = None
+        self._melody_index = 0
 
         # Hardware — initialized in start()
         self._pir = None
@@ -142,6 +143,83 @@ class RoomGuard:
         """Return all available melody names."""
         return [name for name, _ in MOTION_MELODIES]
 
+    def next_melody(self) -> str:
+        """Select the next melody in the library (wraps around). Returns the name."""
+        with self._lock:
+            self._melody_index = (self._melody_index + 1) % len(MOTION_MELODIES)
+            name = MOTION_MELODIES[self._melody_index][0]
+            playing = self._playing
+        self._lcd_flash(">>", name)
+        if not playing:
+            try:
+                self._buzzer.play_tone(NOTE_C5, 0.05)
+            except RuntimeError:
+                pass
+        self._log_message(f"Selected: {name}")
+        return name
+
+    def prev_melody(self) -> str:
+        """Select the previous melody in the library (wraps around). Returns the name."""
+        with self._lock:
+            self._melody_index = (self._melody_index - 1) % len(MOTION_MELODIES)
+            name = MOTION_MELODIES[self._melody_index][0]
+            playing = self._playing
+        self._lcd_flash("<<", name)
+        if not playing:
+            try:
+                self._buzzer.play_tone(NOTE_C4, 0.05)
+            except RuntimeError:
+                pass
+        self._log_message(f"Selected: {name}")
+        return name
+
+    def get_current_melody(self) -> tuple[int, str]:
+        """Return the current melody (index, name)."""
+        with self._lock:
+            return self._melody_index, MOTION_MELODIES[self._melody_index][0]
+
+    def play_current_melody(self) -> str:
+        """Play the currently selected melody. Returns the melody name."""
+        with self._lock:
+            name, notes = MOTION_MELODIES[self._melody_index]
+        self._lcd_flash("Playing:", name)
+        threading.Thread(
+            target=self._play_melody_thread,
+            args=(name, notes),
+            daemon=True,
+        ).start()
+        return name
+
+    def stop_melody(self) -> None:
+        """Stop the currently playing melody."""
+        self._buzzer.cancel()
+        with self._lock:
+            self._playing = False
+        self._log_message("Playback stopped")
+
+    def toggle_arm(self) -> bool:
+        """Toggle arm/disarm with sound cue. Returns the new armed state."""
+        with self._lock:
+            was_armed = self._armed
+            playing = self._playing
+        if playing:
+            self.stop_melody()
+            time.sleep(0.1)
+        if was_armed:
+            self.disarm()
+            try:
+                self._buzzer.play_melody(MELODY_DISARM)
+            except RuntimeError:
+                pass  # buzzer not available
+            return False
+        else:
+            try:
+                self._buzzer.play_melody(MELODY_ARM)
+            except RuntimeError:
+                pass  # buzzer not available
+            self.arm()
+            return True
+
     def get_status(self) -> dict:
         """Return current system state as a dict."""
         with self._lock:
@@ -153,6 +231,8 @@ class RoomGuard:
                 "last_event": self._last_event_time,
                 "started_at": self._started_at,
                 "cooldown": self.cooldown,
+                "current_melody": MOTION_MELODIES[self._melody_index][0],
+                "current_melody_index": self._melody_index,
             }
 
     def get_logs(self, limit: int = 50) -> list[dict]:
@@ -350,8 +430,20 @@ def main() -> None:
         print("[Room Guard] This script must run on a Raspberry Pi with gpiozero installed.")
         sys.exit(1)
 
+    # Start IR remote (non-fatal if unavailable)
+    ir = None
+    try:
+        from ir_remote import IRRemote
+        ir = IRRemote(guard)
+        ir.start()
+        print("[Room Guard] IR remote control active")
+    except Exception as e:
+        print(f"[Room Guard] IR remote not available: {e}")
+
     def shutdown(signum=None, frame=None):
         print()
+        if ir:
+            ir.stop()
         guard.stop()
         sys.exit(0)
 

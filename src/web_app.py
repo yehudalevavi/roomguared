@@ -22,6 +22,7 @@ from buzzer import MELODY_STARTUP
 
 app = Flask(__name__)
 guard = RoomGuard()
+ir_remote = None
 
 
 # --- HTML Dashboard ---
@@ -106,16 +107,61 @@ def api_lcd_message():
     return jsonify({"ok": True, "line1": line1[:16], "line2": line2[:16]})
 
 
+@app.route("/api/melody/next", methods=["POST"])
+def api_melody_next():
+    """Select the next melody."""
+    name = guard.next_melody()
+    return jsonify({"ok": True, "melody": name})
+
+
+@app.route("/api/melody/prev", methods=["POST"])
+def api_melody_prev():
+    """Select the previous melody."""
+    name = guard.prev_melody()
+    return jsonify({"ok": True, "melody": name})
+
+
+@app.route("/api/melody/play", methods=["POST"])
+def api_melody_play():
+    """Play the currently selected melody."""
+    name = guard.play_current_melody()
+    return jsonify({"ok": True, "melody": name})
+
+
+@app.route("/api/melody/stop", methods=["POST"])
+def api_melody_stop():
+    """Stop the currently playing melody."""
+    guard.stop_melody()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/toggle-arm", methods=["POST"])
+def api_toggle_arm():
+    """Toggle arm/disarm with sound cue."""
+    armed = guard.toggle_arm()
+    return jsonify({"ok": True, "armed": armed})
+
+
 # --- Startup ---
 
 def start_guard():
     """Initialize hardware and auto-arm after calibration."""
+    global ir_remote
     try:
         guard.start()
     except Exception as e:
         print(f"[Web App] WARNING: Could not initialize hardware: {e}")
         print("[Web App] Running in software-only mode (no GPIO).")
         return
+
+    # Start IR remote (non-fatal if unavailable)
+    try:
+        from ir_remote import IRRemote
+        ir_remote = IRRemote(guard)
+        ir_remote.start()
+        guard._log_message("IR remote control active")
+    except Exception as e:
+        print(f"[Web App] IR remote not available: {e}")
 
     guard._buzzer.play_melody(MELODY_STARTUP)
     guard._log_message("PIR sensor calibrating (40s)...")
@@ -127,6 +173,8 @@ def start_guard():
 def shutdown_handler(signum=None, frame=None):
     """Clean shutdown on SIGINT/SIGTERM."""
     print()
+    if ir_remote:
+        ir_remote.stop()
     guard.stop()
     sys.exit(0)
 

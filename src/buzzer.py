@@ -11,6 +11,7 @@ Wiring:
     Buzzer (−) → Breadboard − rail (GND)
 """
 
+import threading
 import time
 
 BUZZER_PIN = 22  # GPIO 22 (Physical pin 15) — same pin as the old active buzzer
@@ -89,6 +90,7 @@ class Buzzer:
     def __init__(self, pin: int = BUZZER_PIN):
         self.pin = pin
         self._device = None
+        self._cancel = threading.Event()
 
     def start(self) -> None:
         """Initialize the PWM output device."""
@@ -102,6 +104,12 @@ class Buzzer:
             self._device.off()
             self._device.close()
             self._device = None
+
+    def cancel(self) -> None:
+        """Signal the currently playing melody to stop immediately."""
+        self._cancel.set()
+        if self._device:
+            self._device.off()
 
     def play_tone(self, frequency: float, duration: float) -> None:
         """
@@ -128,6 +136,9 @@ class Buzzer:
         """
         Play a sequence of tones.
 
+        Can be interrupted by calling cancel(). The cancel flag is
+        automatically cleared at the start of each new melody.
+
         Args:
             melody: List of (frequency_hz, duration_seconds) tuples.
                     Use frequency=0 (REST) for silent gaps.
@@ -135,7 +146,11 @@ class Buzzer:
         if self._device is None:
             raise RuntimeError("Buzzer not started. Call start() first.")
 
+        self._cancel.clear()
         for frequency, duration in melody:
+            if self._cancel.is_set():
+                self._device.off()
+                return
             self.play_tone(frequency, duration)
 
     @property

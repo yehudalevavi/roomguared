@@ -186,6 +186,67 @@ class TestPlayMelody(unittest.TestCase):
         self.assertEqual(mock_time.sleep.call_count, 3)
 
 
+class TestBuzzerCancel(unittest.TestCase):
+    """Tests for melody cancellation."""
+
+    def setUp(self):
+        self.buzzer = Buzzer()
+        self.mock_device = MagicMock()
+        self.mock_device.value = 0
+        self.buzzer._device = self.mock_device
+
+    def test_cancel_sets_event(self):
+        self.buzzer.cancel()
+        self.assertTrue(self.buzzer._cancel.is_set())
+
+    def test_cancel_turns_off_device(self):
+        self.buzzer.cancel()
+        self.mock_device.off.assert_called()
+
+    def test_cancel_when_no_device(self):
+        buzzer = Buzzer()
+        buzzer.cancel()  # should not raise
+
+    def test_play_melody_clears_cancel_flag(self):
+        self.buzzer._cancel.set()
+        with patch("buzzer.time"):
+            self.buzzer.play_melody([(440, 0.1)])
+        self.assertFalse(self.buzzer._cancel.is_set())
+
+    def test_cancel_during_melody_stops_early(self):
+        """Melody should stop after the note during which cancel was set."""
+        play_count = [0]
+        original_play_tone = self.buzzer.play_tone
+
+        def counting_play_tone(freq, dur):
+            play_count[0] += 1
+            if play_count[0] == 2:
+                self.buzzer._cancel.set()
+
+        with patch.object(self.buzzer, "play_tone", side_effect=counting_play_tone):
+            self.buzzer.play_melody([(440, 0.1), (880, 0.1), (1320, 0.1)])
+
+        # Should have played 2 notes then stopped before the 3rd
+        self.assertEqual(play_count[0], 2)
+
+    def test_new_melody_plays_after_cancel(self):
+        """After cancel, a new play_melody call should work normally."""
+        self.buzzer.cancel()
+        self.assertTrue(self.buzzer._cancel.is_set())
+
+        with patch("buzzer.time"):
+            self.buzzer.play_melody([(440, 0.1)])
+
+        # cancel should be cleared and the note should have played
+        self.assertFalse(self.buzzer._cancel.is_set())
+        self.mock_device.off.assert_called()
+
+    def test_cancel_event_exists_on_init(self):
+        buzzer = Buzzer()
+        self.assertIsNotNone(buzzer._cancel)
+        self.assertFalse(buzzer._cancel.is_set())
+
+
 class TestMelodyDuration(unittest.TestCase):
     """Tests for melody_duration helper."""
 
