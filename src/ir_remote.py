@@ -110,6 +110,11 @@ class IRRemote:
                     action = self._scancode_map.get(scancode)
                     if action:
                         self._dispatch(action)
+                        # Reset timer after action completes — some actions
+                        # block (e.g. toggle_arm plays a melody), and NEC
+                        # repeats queued during that time would otherwise
+                        # pass the debounce check.
+                        self._last_time = time.monotonic()
         except OSError:
             pass  # device closed during stop()
         except Exception as e:
