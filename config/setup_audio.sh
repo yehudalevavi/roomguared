@@ -37,66 +37,27 @@ else
   echo "  WARNING: $PA_CONF not found — PulseAudio may use defaults"
 fi
 
-# 4. spotifyd
-echo "[4/5] Installing spotifyd..."
-if command -v spotifyd &>/dev/null; then
-  echo "  spotifyd already installed: $(spotifyd --version 2>/dev/null || echo 'unknown version')"
+# 4. Spotify Connect daemon (raspotify — packaged librespot for Raspberry Pi)
+echo "[4/5] Installing raspotify..."
+if command -v librespot &>/dev/null || dpkg -l raspotify &>/dev/null 2>&1; then
+  echo "  raspotify already installed"
 else
-  echo "  Downloading spotifyd binary..."
-  ARCH=$(dpkg --print-architecture)
-  if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
-    wget -q "https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-${ARCH}-default.tar.gz" -O /tmp/spotifyd.tar.gz
-    tar xzf /tmp/spotifyd.tar.gz -C /tmp/
-    mv /tmp/spotifyd /usr/local/bin/spotifyd
-    chmod +x /usr/local/bin/spotifyd
-    rm /tmp/spotifyd.tar.gz
-    echo "  spotifyd installed to /usr/local/bin/spotifyd"
-  else
-    echo "  WARNING: Unsupported architecture '$ARCH' — install spotifyd manually"
+  echo "  Installing raspotify via official script..."
+  curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
+fi
+
+# Configure device name
+RASPOTIFY_CONF="/etc/raspotify/conf"
+if [ -f "$RASPOTIFY_CONF" ]; then
+  if grep -q '^#LIBRESPOT_NAME=' "$RASPOTIFY_CONF"; then
+    sed -i 's|^#LIBRESPOT_NAME=.*|LIBRESPOT_NAME="Room Guard"|' "$RASPOTIFY_CONF"
+    echo "  Set device name to 'Room Guard'"
   fi
 fi
 
-# Create spotifyd config if not exists
-SPOTIFYD_CONF="/etc/spotifyd.conf"
-if [ ! -f "$SPOTIFYD_CONF" ]; then
-  cat > "$SPOTIFYD_CONF" << 'CONF'
-[global]
-device_name = "Room Guard"
-backend = "pulseaudio"
-bitrate = 320
-volume_normalisation = true
-normalisation_pregain = -10
-cache_path = "/tmp/spotifyd-cache"
-CONF
-  echo "  Created $SPOTIFYD_CONF"
-fi
-
-# Create spotifyd systemd service if not exists
-SPOTIFYD_SERVICE="/etc/systemd/system/spotifyd.service"
-if [ ! -f "$SPOTIFYD_SERVICE" ]; then
-  REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
-  cat > "$SPOTIFYD_SERVICE" << EOF
-[Unit]
-Description=Spotifyd - Spotify Connect daemon
-After=network.target sound.target pulseaudio.service bluetooth.service
-
-[Service]
-Type=simple
-User=${REAL_USER}
-ExecStart=/usr/local/bin/spotifyd --no-daemon --config-path /etc/spotifyd.conf
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  echo "  Created spotifyd systemd service"
-fi
-
-echo "[5/5] Enabling and starting spotifyd..."
-systemctl enable spotifyd
-systemctl start spotifyd || echo "  WARNING: spotifyd failed to start — check logs with: journalctl -u spotifyd"
+echo "[5/5] Enabling and starting raspotify..."
+systemctl enable raspotify
+systemctl restart raspotify || echo "  WARNING: raspotify failed to start — check logs with: journalctl -u raspotify"
 
 echo ""
 echo "=== Setup Complete ==="

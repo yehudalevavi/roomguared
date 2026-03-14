@@ -5,12 +5,12 @@ This guide covers how to set up the Raspberry Pi to stream Spotify music through
 ## Architecture
 
 ```
-Spotify Cloud → spotifyd (on Pi) → PulseAudio → Bluetooth A2DP → JBL Flip 7
+Spotify Cloud → raspotify/librespot (on Pi) → ALSA/PulseAudio → Bluetooth A2DP → JBL Flip 7
 ```
 
-- **spotifyd**: lightweight Spotify Connect daemon — handles audio streaming
+- **raspotify**: packaged librespot daemon — handles Spotify Connect audio streaming
 - **Room Guard Flask app**: controls playback via Spotify Web API (spotipy)
-- **PulseAudio**: routes audio from spotifyd to the Bluetooth speaker
+- **PulseAudio**: routes audio from raspotify to the Bluetooth speaker
 
 ## Prerequisites
 
@@ -33,82 +33,35 @@ sudo apt update
 sudo apt install -y bluez pulseaudio pulseaudio-module-bluetooth
 ```
 
-## Step 2: Install spotifyd
+## Step 2: Install raspotify (Spotify Connect daemon)
 
-### Option A: From apt (if available)
-
-```bash
-sudo apt install -y spotifyd
-```
-
-### Option B: Download binary
+raspotify is a packaged version of librespot specifically for Raspberry Pi.
 
 ```bash
-# Download the latest armhf release
-wget https://github.com/Spotifyd/spotifyd/releases/latest/download/spotifyd-linux-armhf-default.tar.gz
-tar xzf spotifyd-linux-armhf-default.tar.gz
-sudo mv spotifyd /usr/local/bin/
-sudo chmod +x /usr/local/bin/spotifyd
+curl -sL https://dtcooper.github.io/raspotify/install.sh | sudo sh
 ```
 
-### Configure spotifyd
+### Configure raspotify
 
-Create `/etc/spotifyd.conf`:
-
-```ini
-[global]
-# The name that shows up in Spotify Connect device list
-device_name = "Room Guard"
-
-# Audio backend
-backend = "pulseaudio"
-
-# Audio quality (96, 160, or 320 kbps)
-bitrate = 320
-
-# Reduce volume normalization for better dynamic range
-volume_normalisation = true
-normalisation_pregain = -10
-
-# Cache for faster startup
-cache_path = "/tmp/spotifyd-cache"
-
-# No password needed — we authenticate via OAuth in Room Guard dashboard
-```
-
-### Enable spotifyd as a service
+Edit `/etc/raspotify/conf` and set the device name:
 
 ```bash
-# If installed via apt:
-sudo systemctl enable spotifyd
-sudo systemctl start spotifyd
-
-# If using manual binary, create a systemd unit:
-sudo tee /etc/systemd/system/spotifyd.service << 'EOF'
-[Unit]
-Description=Spotifyd - Spotify Connect daemon
-After=network.target sound.target pulseaudio.service bluetooth.service
-
-[Service]
-Type=simple
-User=yehudalevavi
-ExecStart=/usr/local/bin/spotifyd --no-daemon --config-path /etc/spotifyd.conf
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable spotifyd
-sudo systemctl start spotifyd
+sudo nano /etc/raspotify/conf
 ```
 
-Verify spotifyd is running:
+Uncomment and set:
+```
+LIBRESPOT_NAME="Room Guard"
+```
 
+Then restart:
 ```bash
-sudo systemctl status spotifyd
+sudo systemctl restart raspotify
+```
+
+Verify it's running:
+```bash
+sudo systemctl status raspotify
 ```
 
 ## Step 3: Configure PulseAudio for Bluetooth
@@ -172,12 +125,12 @@ After initial pairing, the speaker will auto-reconnect on startup (if powered on
 1. Check Bluetooth connection: `bluetoothctl info` should show "Connected: yes"
 2. Check PulseAudio sink: `pactl list sinks short` — look for the BT device
 3. Set BT device as default sink: `pactl set-default-sink <sink_name>`
-4. Check spotifyd is running: `sudo systemctl status spotifyd`
+4. Check raspotify is running: `sudo systemctl status raspotify`
 
-### spotifyd not showing in Spotify
+### raspotify not showing in Spotify
 
-1. Ensure spotifyd is running: `sudo systemctl status spotifyd`
-2. Check spotifyd logs: `sudo journalctl -u spotifyd -f`
+1. Ensure raspotify is running: `sudo systemctl status raspotify`
+2. Check logs: `sudo journalctl -u raspotify -f`
 3. Verify PulseAudio is running: `pulseaudio --check && echo "running"`
 4. The Pi and your phone/computer must be on the same network
 
