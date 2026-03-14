@@ -55,7 +55,13 @@ def _install_gpio_shim():
         # Real RPi.GPIO already loaded — too late to shim
         return
 
-    from gpiozero import OutputDevice
+    from gpiozero import Device, OutputDevice
+    try:
+        from gpiozero.pins.lgpio import LGPIOFactory
+        if not isinstance(Device.pin_factory, LGPIOFactory):
+            Device.pin_factory = LGPIOFactory()
+    except Exception:
+        pass  # Fall back to whatever gpiozero picks
 
     class GPIOShim:
         _is_shim = True
