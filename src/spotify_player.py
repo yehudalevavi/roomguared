@@ -212,7 +212,7 @@ class SpotifyPlayer:
             uri = track["uri"]
 
             # Start playback on the Pi device
-            device_id = self._get_pi_device_id()
+            device_id = self._ensure_pi_device()
             self._sp.start_playback(device_id=device_id, uris=[uri])
 
             track_info = self._simplify_track(track)
@@ -227,7 +227,7 @@ class SpotifyPlayer:
         """Play a specific Spotify track URI."""
         self._ensure_client()
         try:
-            device_id = self._get_pi_device_id()
+            device_id = self._ensure_pi_device()
             self._sp.start_playback(device_id=device_id, uris=[uri])
             return True
         except Exception as e:
@@ -248,7 +248,7 @@ class SpotifyPlayer:
         """Resume playback."""
         self._ensure_client()
         try:
-            device_id = self._get_pi_device_id()
+            device_id = self._ensure_pi_device()
             self._sp.start_playback(device_id=device_id)
             return True
         except Exception as e:
@@ -381,20 +381,39 @@ class SpotifyPlayer:
             self._sp = None
 
     def _get_pi_device_id(self) -> str | None:
-        """Find the spotifyd device in the Spotify Connect device list."""
+        """Find the Room Guard (raspotify) device in Spotify Connect list.
+
+        Returns the device ID only if it matches SPOTIFYD_DEVICE_NAME.
+        Never falls back to other devices — we only want to play on the Pi.
+        """
         try:
             result = self._sp.devices()
             for device in result.get("devices", []):
                 name = device.get("name", "").lower()
                 if SPOTIFYD_DEVICE_NAME.lower() in name:
                     return device["id"]
-            # If not found by name, return first available device
-            devices = result.get("devices", [])
-            if devices:
-                return devices[0]["id"]
         except Exception:
             pass
         return None
+
+    def _ensure_pi_device(self) -> str | None:
+        """Get the Pi device ID and transfer playback to it.
+
+        This forces Spotify to move the active context to the Pi
+        so that play commands don't end up on the desktop or phone.
+        Returns the device ID, or None if the Pi device is not found.
+        """
+        device_id = self._get_pi_device_id()
+        if not device_id:
+            print("[Spotify] WARNING: Room Guard device not found in Spotify Connect")
+            return None
+        try:
+            self._sp.transfer_playback(device_id, force_play=False)
+        except Exception:
+            # Transfer may fail if nothing is playing yet — that's OK,
+            # start_playback with device_id will still target it.
+            pass
+        return device_id
 
     @staticmethod
     def _simplify_track(track: dict) -> dict:

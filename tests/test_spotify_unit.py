@@ -394,17 +394,36 @@ class TestSpotifyPlayerDevices(unittest.TestCase):
         device_id = self.sp._get_pi_device_id()
         self.assertEqual(device_id, "d2")
 
-    def test_get_pi_device_id_fallback(self):
+    def test_get_pi_device_id_no_fallback_to_other_devices(self):
+        """Should return None when only non-Pi devices are available."""
         self.sp._sp.devices.return_value = {
             "devices": [{"id": "d1", "name": "Phone"}]
         }
         device_id = self.sp._get_pi_device_id()
-        self.assertEqual(device_id, "d1")
+        self.assertIsNone(device_id)
 
     def test_get_pi_device_id_none(self):
         self.sp._sp.devices.return_value = {"devices": []}
         device_id = self.sp._get_pi_device_id()
         self.assertIsNone(device_id)
+
+    def test_ensure_pi_device_transfers_playback(self):
+        """_ensure_pi_device should transfer playback to the Pi device."""
+        self.sp._sp.devices.return_value = {
+            "devices": [{"id": "d2", "name": "Room Guard"}]
+        }
+        device_id = self.sp._ensure_pi_device()
+        self.assertEqual(device_id, "d2")
+        self.sp._sp.transfer_playback.assert_called_once_with("d2", force_play=False)
+
+    def test_ensure_pi_device_returns_none_when_not_found(self):
+        """_ensure_pi_device should return None if Pi device is absent."""
+        self.sp._sp.devices.return_value = {
+            "devices": [{"id": "d1", "name": "Phone"}]
+        }
+        device_id = self.sp._ensure_pi_device()
+        self.assertIsNone(device_id)
+        self.sp._sp.transfer_playback.assert_not_called()
 
 
 class TestJsonCacheHandler(unittest.TestCase):
