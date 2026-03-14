@@ -18,7 +18,7 @@ Dependencies (system):
 
 Setup:
     1. Create a Spotify Developer App at https://developer.spotify.com/dashboard
-    2. Set redirect URI to http://localhost:5000/api/spotify/callback
+    2. Set redirect URI to http://127.0.0.1:5000/api/spotify/callback
     3. Enter client_id and client_secret via the web dashboard or config file
 """
 
@@ -33,7 +33,7 @@ DEFAULT_CONFIG_PATH = os.path.join(
 )
 
 SCOPES = "user-library-read user-modify-playback-state user-read-playback-state user-read-currently-playing"
-DEFAULT_REDIRECT_URI = "http://localhost:5000/api/spotify/callback"
+DEFAULT_REDIRECT_URI = "http://127.0.0.1:5000/api/spotify/callback"
 SPOTIFYD_DEVICE_NAME = "Room Guard"
 
 
