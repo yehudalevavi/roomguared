@@ -25,7 +25,9 @@ Setup:
 import json
 import os
 import random
+import subprocess
 import threading
+import time
 
 DEFAULT_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -396,22 +398,44 @@ class SpotifyPlayer:
             pass
         return None
 
+    def _wake_raspotify(self) -> None:
+        """Restart raspotify so it re-advertises on Spotify Connect.
+
+        librespot/raspotify goes dormant after ~30s of inactivity and
+        disappears from the devices list. A restart makes it visible again.
+        """
+        try:
+            subprocess.run(
+                ["sudo", "systemctl", "restart", "raspotify"],
+                capture_output=True, timeout=10,
+            )
+            # Give raspotify time to register with Spotify Connect
+            time.sleep(3)
+            print("[Spotify] Restarted raspotify to wake device")
+        except Exception as e:
+            print(f"[Spotify] WARNING: Could not restart raspotify: {e}")
+
     def _ensure_pi_device(self) -> str | None:
         """Get the Pi device ID and transfer playback to it.
 
-        This forces Spotify to move the active context to the Pi
-        so that play commands don't end up on the desktop or phone.
-        Returns the device ID, or None if the Pi device is not found.
+        If the Pi device is not visible (raspotify dormant), wakes it
+        up by restarting the service and retries once.
+        Returns the device ID, or None if still not found.
         """
         device_id = self._get_pi_device_id()
+
+        if not device_id:
+            # raspotify likely went dormant — wake it up and retry
+            self._wake_raspotify()
+            device_id = self._get_pi_device_id()
+
         if not device_id:
             print("[Spotify] WARNING: Room Guard device not found in Spotify Connect")
             return None
+
         try:
             self._sp.transfer_playback(device_id, force_play=False)
         except Exception:
-            # Transfer may fail if nothing is playing yet — that's OK,
-            # start_playback with device_id will still target it.
             pass
         return device_id
 

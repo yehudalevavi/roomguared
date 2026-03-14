@@ -407,7 +407,9 @@ class TestSpotifyPlayerDevices(unittest.TestCase):
         device_id = self.sp._get_pi_device_id()
         self.assertIsNone(device_id)
 
-    def test_ensure_pi_device_transfers_playback(self):
+    @patch("spotify_player.subprocess")
+    @patch("spotify_player.time")
+    def test_ensure_pi_device_transfers_playback(self, mock_time, mock_subprocess):
         """_ensure_pi_device should transfer playback to the Pi device."""
         self.sp._sp.devices.return_value = {
             "devices": [{"id": "d2", "name": "Room Guard"}]
@@ -416,8 +418,23 @@ class TestSpotifyPlayerDevices(unittest.TestCase):
         self.assertEqual(device_id, "d2")
         self.sp._sp.transfer_playback.assert_called_once_with("d2", force_play=False)
 
-    def test_ensure_pi_device_returns_none_when_not_found(self):
-        """_ensure_pi_device should return None if Pi device is absent."""
+    @patch("spotify_player.subprocess")
+    @patch("spotify_player.time")
+    def test_ensure_pi_device_wakes_raspotify(self, mock_time, mock_subprocess):
+        """_ensure_pi_device should restart raspotify if device not found, then retry."""
+        # First call: no devices; second call (after wake): device appears
+        self.sp._sp.devices.side_effect = [
+            {"devices": []},
+            {"devices": [{"id": "d2", "name": "Room Guard"}]},
+        ]
+        device_id = self.sp._ensure_pi_device()
+        self.assertEqual(device_id, "d2")
+        mock_subprocess.run.assert_called_once()
+
+    @patch("spotify_player.subprocess")
+    @patch("spotify_player.time")
+    def test_ensure_pi_device_returns_none_after_wake_fail(self, mock_time, mock_subprocess):
+        """_ensure_pi_device should return None if Pi device absent even after wake."""
         self.sp._sp.devices.return_value = {
             "devices": [{"id": "d1", "name": "Phone"}]
         }
