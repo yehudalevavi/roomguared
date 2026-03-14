@@ -187,6 +187,7 @@ class BluetoothSpeaker:
             self._device_name = name or address
 
         self._save_config()
+        self._set_as_default_sink(address)
         print(f"[Bluetooth] Connected to {self._device_name}")
         return True
 
@@ -278,8 +279,11 @@ class BluetoothSpeaker:
                 "device_address": self._device_address,
             }
 
-    def auto_connect(self) -> bool:
+    def auto_connect(self, retries=3, delay=5) -> bool:
         """Attempt to connect to the last known device from config.
+
+        Retries several times with a delay to handle the case where
+        the BT speaker is still booting up after a power cycle.
 
         Returns True if connection succeeded, False otherwise.
         Fails silently if no saved device or device is unavailable.
@@ -294,8 +298,29 @@ class BluetoothSpeaker:
             print("[Bluetooth] No saved device for auto-connect")
             return False
 
-        print(f"[Bluetooth] Auto-connecting to {address}...")
-        return self.connect(address)
+        for attempt in range(1, retries + 1):
+            print(f"[Bluetooth] Auto-connect attempt {attempt}/{retries} to {address}...")
+            if self.connect(address):
+                return True
+            if attempt < retries:
+                time.sleep(delay)
+
+        print(f"[Bluetooth] Auto-connect failed after {retries} attempts")
+        return False
+
+    def _set_as_default_sink(self, address: str) -> None:
+        """Set the Bluetooth device as the default PulseAudio sink."""
+        sink_name = "bluez_sink." + address.replace(":", "_") + ".a2dp_sink"
+        try:
+            # Wait briefly for PulseAudio to register the BT sink
+            time.sleep(2)
+            subprocess.run(
+                ["pactl", "set-default-sink", sink_name],
+                capture_output=True, timeout=5,
+            )
+            print(f"[Bluetooth] Set default audio sink to {sink_name}")
+        except Exception as e:
+            print(f"[Bluetooth] WARNING: Could not set default sink: {e}")
 
     def _get_device_flags(self, address: str) -> tuple[bool, bool]:
         """Check if a device is paired and/or connected via bluetoothctl info."""
