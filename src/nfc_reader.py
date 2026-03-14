@@ -386,6 +386,36 @@ class NFCReader:
             elif action == "prev_melody":
                 name = self._guard.prev_melody()
                 print(f"[NFC Reader] Prev: {name}")
+            elif action == "play_random_song":
+                self._beep_confirm()
+                track = self._guard.play_random_song()
+                if track:
+                    print(f"[NFC Reader] Spotify: {track['name']}")
+                else:
+                    print("[NFC Reader] Spotify: could not play")
+                    self._beep_error()
+            elif action == "spotify_pause":
+                try:
+                    playback = self._guard._spotify.get_current_playback()
+                    if playback and playback.get("is_playing"):
+                        self._guard.spotify_pause()
+                    else:
+                        self._guard.spotify_resume()
+                except Exception:
+                    self._guard.spotify_resume()
+                self._beep_confirm()
+            elif action == "spotify_next":
+                self._guard.spotify_next()
+                self._beep_confirm()
+            elif action == "spotify_prev":
+                self._guard.spotify_prev()
+                self._beep_confirm()
+            elif action.startswith("play_track:"):
+                uri = action.split(":", 1)[1]
+                self._beep_confirm()
+                success = self._guard._spotify.play_track(uri)
+                if not success:
+                    self._beep_error()
             else:
                 print(f"[NFC Reader] Unknown action: {action}")
                 self._beep_error()

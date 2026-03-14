@@ -32,6 +32,13 @@ ELEGOO_SCANCODE_MAP = {
     0x43: "next_melody",     # >|| button
     0x40: "play_pause",      # >>| button
     0x45: "toggle_arm",      # CH- button (top-left — acts as the "red button")
+    # Spotify transport controls
+    0x07: "spotify_random",  # EQ button — play random liked song
+    0x09: "spotify_pause",   # + button — pause/resume Spotify
+    0x15: "spotify_next",    # >> button — next Spotify track
+    0x16: "spotify_prev",    # << button — previous Spotify track
+    0x19: "volume_up",       # VOL+ button
+    0x0D: "volume_down",     # VOL- button
 }
 
 
@@ -141,5 +148,46 @@ class IRRemote:
                 armed = self._guard.toggle_arm()
                 state = "Armed" if armed else "Disarmed"
                 print(f"[IR Remote] {state}")
+            elif action == "spotify_random":
+                track = self._guard.play_random_song()
+                if track:
+                    print(f"[IR Remote] Spotify: {track['name']}")
+                else:
+                    print("[IR Remote] Spotify: could not play")
+            elif action == "spotify_pause":
+                # Toggle: if playing → pause, if paused → resume
+                try:
+                    playback = self._guard._spotify.get_current_playback()
+                    if playback and playback.get("is_playing"):
+                        self._guard.spotify_pause()
+                        print("[IR Remote] Spotify: paused")
+                    else:
+                        self._guard.spotify_resume()
+                        print("[IR Remote] Spotify: resumed")
+                except Exception:
+                    self._guard.spotify_resume()
+                    print("[IR Remote] Spotify: resume attempt")
+            elif action == "spotify_next":
+                self._guard.spotify_next()
+                print("[IR Remote] Spotify: next track")
+            elif action == "spotify_prev":
+                self._guard.spotify_prev()
+                print("[IR Remote] Spotify: previous track")
+            elif action == "volume_up":
+                try:
+                    playback = self._guard._spotify.get_current_playback()
+                    current = playback.get("volume_percent", 50) if playback else 50
+                    self._guard.spotify_volume(min(100, current + 10))
+                    print(f"[IR Remote] Volume: {min(100, current + 10)}%")
+                except Exception:
+                    self._guard.spotify_volume(60)
+            elif action == "volume_down":
+                try:
+                    playback = self._guard._spotify.get_current_playback()
+                    current = playback.get("volume_percent", 50) if playback else 50
+                    self._guard.spotify_volume(max(0, current - 10))
+                    print(f"[IR Remote] Volume: {max(0, current - 10)}%")
+                except Exception:
+                    self._guard.spotify_volume(40)
         except Exception as e:
             print(f"[IR Remote] Action '{action}' failed: {e}")

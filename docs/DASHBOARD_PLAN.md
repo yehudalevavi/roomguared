@@ -587,4 +587,102 @@ RPLCD
 evdev
 mfrc522
 spidev
+spotipy>=2.23
 ```
+
+---
+
+## Phase 10: Spotify + Bluetooth Speaker Integration
+
+**Status: ✅ Complete**
+
+**Goal:** Stream Spotify music through a JBL Flip 7 Bluetooth speaker, controlled via IR remote, NFC card, or web dashboard.
+
+### Architecture
+
+```
+Spotify Cloud → spotifyd (daemon) → PulseAudio → Bluetooth A2DP → JBL Flip 7
+```
+
+- **spotifyd** runs as a separate systemd service making the Pi a Spotify Connect device
+- **Room Guard** controls playback via Spotify Web API (spotipy library)
+- **BlueZ/bluetoothctl** manages Bluetooth speaker pairing and A2DP connection
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `src/bluetooth_speaker.py` | BlueZ wrapper — scan, pair, connect, disconnect, auto-reconnect |
+| `src/spotify_player.py` | Spotify Web API — OAuth2, liked songs, transport controls |
+| `config/setup_audio.sh` | System package installer (PulseAudio, BlueZ, spotifyd) |
+| `docs/SPOTIFY_SETUP.md` | Full setup guide with troubleshooting |
+| `tests/test_bluetooth_unit.py` | 30 unit tests for Bluetooth module |
+| `tests/test_spotify_unit.py` | 49 unit tests for Spotify module |
+| `tests/test_media_integration.py` | 28 integration tests for RoomGuard media layer |
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `src/room_guard.py` | Added BluetoothSpeaker + SpotifyPlayer instances, media methods, Now Playing LCD page |
+| `src/web_app.py` | 17 new API endpoints (BT + Spotify + OAuth) |
+| `src/ir_remote.py` | 6 new transport key mappings (random play, pause, next, prev, vol up/down) |
+| `src/nfc_reader.py` | 5 new card actions (play_random_song, spotify_pause/next/prev, play_track) |
+| `src/templates/index.html` | 3 new dashboard panels (BT pairing, Spotify auth, Now Playing controls) |
+| `requirements.txt` | Added `spotipy>=2.23` |
+
+### API Endpoints
+
+**Bluetooth:**
+- `GET /api/bluetooth/status` — connection status
+- `POST /api/bluetooth/scan` — discover nearby devices
+- `POST /api/bluetooth/pair` — pair + connect to device
+- `POST /api/bluetooth/connect` — connect to paired device
+- `POST /api/bluetooth/disconnect` — disconnect speaker
+- `DELETE /api/bluetooth/device/<address>` — forget device
+
+**Spotify:**
+- `GET /api/spotify/status` — auth + playback status
+- `POST /api/spotify/credentials` — save client_id + client_secret
+- `GET /api/spotify/auth` — get OAuth2 URL
+- `GET /api/spotify/callback` — OAuth2 callback handler
+- `POST /api/spotify/play-random` — play random liked song
+- `POST /api/spotify/play` — play specific track URI
+- `POST /api/spotify/pause` — pause playback
+- `POST /api/spotify/resume` — resume playback
+- `POST /api/spotify/next` — skip next
+- `POST /api/spotify/prev` — skip previous
+- `POST /api/spotify/volume` — set volume (0-100)
+- `GET /api/spotify/devices` — list Spotify Connect devices
+- `POST /api/spotify/transfer` — transfer playback to device
+
+### IR Remote Mapping (Elegoo NEC Remote)
+
+| Button | Scancode | Action |
+|--------|----------|--------|
+| EQ | `0x07` | Play random liked song |
+| + | `0x09` | Pause/resume Spotify |
+| >> | `0x15` | Next Spotify track |
+| << | `0x16` | Previous Spotify track |
+| VOL+ | `0x19` | Volume up 10% |
+| VOL- | `0x0D` | Volume down 10% |
+
+### NFC Card Actions
+
+| Action | Description |
+|--------|-------------|
+| `play_random_song` | Play a random song from Spotify liked songs |
+| `spotify_pause` | Toggle pause/resume |
+| `spotify_next` | Skip to next track |
+| `spotify_prev` | Skip to previous track |
+| `play_track:<uri>` | Play a specific Spotify track URI |
+
+### Setup Instructions
+
+See `docs/SPOTIFY_SETUP.md` for full setup guide including:
+- System package installation
+- spotifyd configuration
+- Spotify Developer App creation
+- OAuth2 authentication flow
+- Bluetooth speaker pairing
+- Troubleshooting

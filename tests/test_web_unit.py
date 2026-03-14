@@ -385,5 +385,269 @@ class TestRoomGuardClass(unittest.TestCase):
         self.assertEqual(status["current_melody_index"], 1)
 
 
+class TestBluetoothAPI(unittest.TestCase):
+    """Tests for Bluetooth REST API endpoints."""
+
+    def setUp(self):
+        app.testing = True
+        self.client = app.test_client()
+        guard._bt_speaker = MagicMock()
+
+    def test_bt_status(self):
+        guard._bt_speaker.get_status.return_value = {
+            "connected": False, "paired": False,
+            "device_name": None, "device_address": None,
+        }
+        r = self.client.get("/api/bluetooth/status")
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertIn("connected", d)
+
+    def test_bt_scan(self):
+        guard._bt_speaker.scan.return_value = [
+            {"address": "AA:BB:CC:DD:EE:FF", "name": "JBL", "paired": False, "connected": False}
+        ]
+        r = self.client.post("/api/bluetooth/scan",
+                             data=json.dumps({"timeout": 5}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertEqual(len(d["devices"]), 1)
+
+    def test_bt_pair(self):
+        guard._bt_speaker.pair.return_value = True
+        guard._bt_speaker.get_status.return_value = {"connected": True, "paired": True, "device_name": "JBL", "device_address": "AA:BB"}
+        r = self.client.post("/api/bluetooth/pair",
+                             data=json.dumps({"address": "AA:BB:CC:DD:EE:FF"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_bt_pair_no_address(self):
+        r = self.client.post("/api/bluetooth/pair",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_bt_connect(self):
+        guard._bt_speaker.connect.return_value = True
+        guard._bt_speaker.get_status.return_value = {"connected": True, "paired": True, "device_name": "JBL", "device_address": "AA:BB"}
+        r = self.client.post("/api/bluetooth/connect",
+                             data=json.dumps({"address": "AA:BB:CC:DD:EE:FF"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_bt_disconnect(self):
+        guard._bt_speaker.disconnect.return_value = True
+        guard._bt_speaker.get_status.return_value = {"connected": False, "paired": True, "device_name": "JBL", "device_address": "AA:BB"}
+        r = self.client.post("/api/bluetooth/disconnect")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_bt_remove(self):
+        guard._bt_speaker.remove.return_value = True
+        r = self.client.delete("/api/bluetooth/device/AA:BB:CC:DD:EE:FF")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+
+class TestSpotifyAPI(unittest.TestCase):
+    """Tests for Spotify REST API endpoints."""
+
+    def setUp(self):
+        app.testing = True
+        self.client = app.test_client()
+        guard._spotify = MagicMock()
+        guard._bt_speaker = MagicMock()
+        guard._bt_speaker.get_status.return_value = {"connected": False}
+        guard._lcd = MagicMock()
+        guard._lcd._lcd = None
+
+    def test_spotify_status(self):
+        guard._spotify.is_authenticated.return_value = False
+        guard._spotify.is_configured.return_value = False
+        r = self.client.get("/api/spotify/status")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertIn("authenticated", d)
+
+    def test_spotify_credentials(self):
+        r = self.client.post("/api/spotify/credentials",
+                             data=json.dumps({"client_id": "id", "client_secret": "secret"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        guard._spotify.set_credentials.assert_called_once_with("id", "secret")
+
+    def test_spotify_credentials_missing(self):
+        r = self.client.post("/api/spotify/credentials",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_spotify_auth(self):
+        guard._spotify.get_auth_url.return_value = "https://accounts.spotify.com/authorize?..."
+        r = self.client.get("/api/spotify/auth")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertIn("auth_url", d)
+
+    def test_spotify_auth_not_configured(self):
+        guard._spotify.get_auth_url.return_value = None
+        r = self.client.get("/api/spotify/auth")
+        self.assertEqual(r.status_code, 400)
+
+    def test_spotify_callback_success(self):
+        guard._spotify.handle_auth_callback.return_value = True
+        r = self.client.get("/api/spotify/callback?code=test_code")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"connected", r.data)
+
+    def test_spotify_callback_error(self):
+        r = self.client.get("/api/spotify/callback?error=access_denied")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"denied", r.data)
+
+    def test_spotify_callback_no_code(self):
+        r = self.client.get("/api/spotify/callback")
+        self.assertEqual(r.status_code, 400)
+
+    def test_spotify_play_random(self):
+        guard._spotify.is_authenticated.return_value = True
+        guard._spotify.play_random_liked_song.return_value = {
+            "name": "Song", "artist": "Artist", "uri": "spotify:track:123",
+        }
+        r = self.client.post("/api/spotify/play-random")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertIn("track", d)
+
+    def test_spotify_play_random_fail(self):
+        guard._spotify.is_authenticated.return_value = False
+        r = self.client.post("/api/spotify/play-random")
+        self.assertEqual(r.status_code, 500)
+
+    def test_spotify_play_uri(self):
+        guard._spotify.play_track.return_value = True
+        r = self.client.post("/api/spotify/play",
+                             data=json.dumps({"uri": "spotify:track:abc"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_play_uri_missing(self):
+        r = self.client.post("/api/spotify/play",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_spotify_pause(self):
+        guard._spotify.pause.return_value = True
+        r = self.client.post("/api/spotify/pause")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_resume(self):
+        guard._spotify.resume.return_value = True
+        r = self.client.post("/api/spotify/resume")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_next(self):
+        guard._spotify.next_track.return_value = True
+        r = self.client.post("/api/spotify/next")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_prev(self):
+        guard._spotify.prev_track.return_value = True
+        r = self.client.post("/api/spotify/prev")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_volume(self):
+        guard._spotify.set_volume.return_value = True
+        r = self.client.post("/api/spotify/volume",
+                             data=json.dumps({"percent": 75}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_volume_missing(self):
+        r = self.client.post("/api/spotify/volume",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_spotify_devices(self):
+        guard._spotify.get_devices.return_value = [
+            {"id": "d1", "name": "Room Guard", "type": "Computer", "is_active": True}
+        ]
+        r = self.client.get("/api/spotify/devices")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertEqual(len(d["devices"]), 1)
+
+    def test_spotify_transfer(self):
+        guard._spotify.transfer_playback.return_value = True
+        r = self.client.post("/api/spotify/transfer",
+                             data=json.dumps({"device_id": "dev123"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_spotify_transfer_missing_device(self):
+        r = self.client.post("/api/spotify/transfer",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+
+class TestNFCNewActions(unittest.TestCase):
+    """Tests for new NFC music actions in the register endpoint."""
+
+    def setUp(self):
+        app.testing = True
+        self.client = app.test_client()
+        # Import and set up nfc_reader module-level var
+        import web_app
+        self.mock_nfc = MagicMock()
+        web_app.nfc_reader = self.mock_nfc
+
+    def test_register_play_random_song_action(self):
+        r = self.client.post("/api/nfc/register",
+                             data=json.dumps({"uid": "0xABC", "action": "play_random_song", "label": "Music card"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_register_spotify_pause_action(self):
+        r = self.client.post("/api/nfc/register",
+                             data=json.dumps({"uid": "0xDEF", "action": "spotify_pause"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_register_spotify_next_action(self):
+        r = self.client.post("/api/nfc/register",
+                             data=json.dumps({"uid": "0x111", "action": "spotify_next"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def test_register_play_track_action(self):
+        r = self.client.post("/api/nfc/register",
+                             data=json.dumps({"uid": "0x222", "action": "play_track:spotify:track:abc"}),
+                             content_type="application/json")
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+
+    def tearDown(self):
+        import web_app
+        web_app.nfc_reader = None
+
+
 if __name__ == "__main__":
     unittest.main()

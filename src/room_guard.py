@@ -15,6 +15,8 @@ from datetime import datetime
 from buzzer import Buzzer, MELODY_STARTUP, MELODY_ARM, MELODY_DISARM, NOTE_C4, NOTE_C5, melody_duration
 from melody_library import MOTION_MELODIES, get_random_melody
 from lcd_display import LCDDisplay
+from bluetooth_speaker import BluetoothSpeaker
+from spotify_player import SpotifyPlayer
 
 # --- Configuration ---
 PIR_PIN = 17     # GPIO 17 (Physical pin 11) — PIR sensor OUT
@@ -54,6 +56,10 @@ class RoomGuard:
         self._buzzer = Buzzer()
         self._lcd = LCDDisplay()
 
+        # Media modules — initialized in start()
+        self._bt_speaker = BluetoothSpeaker()
+        self._spotify = SpotifyPlayer()
+
         # LCD cycling state
         self._lcd_running = False
         self._lcd_thread: threading.Thread | None = None
@@ -80,6 +86,23 @@ class RoomGuard:
 
         self._log_message("System started")
 
+        # Start media modules (non-fatal if they fail)
+        try:
+            self._bt_speaker.start()
+        except Exception as e:
+            print(f"[Room Guard] WARNING: Bluetooth init failed: {e}")
+
+        try:
+            self._spotify.start()
+        except Exception as e:
+            print(f"[Room Guard] WARNING: Spotify init failed: {e}")
+
+        # Auto-connect to previously paired BT speaker
+        try:
+            self._bt_speaker.auto_connect()
+        except Exception as e:
+            print(f"[Room Guard] BT auto-connect skipped: {e}")
+
     def stop(self) -> None:
         """Shut down hardware."""
         self.disarm()
@@ -91,6 +114,17 @@ class RoomGuard:
         self._lcd_show("Room Guard OFF", "Goodbye!")
         time.sleep(1)
         self._lcd.stop()
+
+        # Stop media modules
+        try:
+            self._spotify.stop()
+        except Exception:
+            pass
+        try:
+            self._bt_speaker.stop()
+        except Exception:
+            pass
+
         self._log_message("System stopped")
 
     def arm(self) -> None:
@@ -223,7 +257,7 @@ class RoomGuard:
     def get_status(self) -> dict:
         """Return current system state as a dict."""
         with self._lock:
-            return {
+            status = {
                 "armed": self._armed,
                 "led_on": self._led_on,
                 "playing": self._playing,
@@ -234,11 +268,108 @@ class RoomGuard:
                 "current_melody": MOTION_MELODIES[self._melody_index][0],
                 "current_melody_index": self._melody_index,
             }
+        # Media status (outside main lock to avoid deadlock)
+        try:
+            status["bt_connected"] = self._bt_speaker.get_status().get("connected", False)
+        except Exception:
+            status["bt_connected"] = False
+        try:
+            status["spotify_authenticated"] = self._spotify.is_authenticated()
+        except Exception:
+            status["spotify_authenticated"] = False
+        return status
 
     def get_logs(self, limit: int = 50) -> list[dict]:
         """Return recent log entries."""
         with self._lock:
             return list(reversed(self._event_log[-limit:]))
+
+    # --- Media (Bluetooth + Spotify) ---
+
+    def get_bt_status(self) -> dict:
+        """Return Bluetooth speaker connection status."""
+        return self._bt_speaker.get_status()
+
+    def get_spotify_status(self) -> dict:
+        """Return Spotify auth + playback status."""
+        status = {
+            "authenticated": self._spotify.is_authenticated(),
+            "configured": self._spotify.is_configured(),
+        }
+        if status["authenticated"]:
+            try:
+                playback = self._spotify.get_current_playback()
+                status["playback"] = playback
+            except Exception:
+                status["playback"] = None
+        return status
+
+    def play_random_song(self) -> dict | None:
+        """Play a random song from Spotify liked songs. Returns track info or None."""
+        if not self._spotify.is_authenticated():
+            self._log_message("Spotify not authenticated")
+            return None
+        try:
+            track = self._spotify.play_random_liked_song()
+            if track:
+                self._lcd_flash("Spotify:", track["name"][:16])
+                self._log_message(f"Spotify: {track['name']} — {track['artist']}")
+            return track
+        except Exception as e:
+            self._log_message(f"Spotify play failed: {e}")
+            return None
+
+    def spotify_pause(self) -> bool:
+        """Pause Spotify playback."""
+        try:
+            result = self._spotify.pause()
+            if result:
+                self._lcd_flash("Spotify", "Paused")
+            return result
+        except Exception as e:
+            self._log_message(f"Spotify pause failed: {e}")
+            return False
+
+    def spotify_resume(self) -> bool:
+        """Resume Spotify playback."""
+        try:
+            result = self._spotify.resume()
+            if result:
+                self._lcd_flash("Spotify", "Playing")
+            return result
+        except Exception as e:
+            self._log_message(f"Spotify resume failed: {e}")
+            return False
+
+    def spotify_next(self) -> bool:
+        """Skip to next Spotify track."""
+        try:
+            result = self._spotify.next_track()
+            if result:
+                self._lcd_flash("Spotify", ">> Next")
+            return result
+        except Exception as e:
+            self._log_message(f"Spotify next failed: {e}")
+            return False
+
+    def spotify_prev(self) -> bool:
+        """Skip to previous Spotify track."""
+        try:
+            result = self._spotify.prev_track()
+            if result:
+                self._lcd_flash("Spotify", "<< Prev")
+            return result
+        except Exception as e:
+            self._log_message(f"Spotify prev failed: {e}")
+            return False
+
+    def spotify_volume(self, percent: int) -> bool:
+        """Set Spotify playback volume (0-100)."""
+        try:
+            return self._spotify.set_volume(percent)
+        except Exception as e:
+            self._log_message(f"Spotify volume failed: {e}")
+            return False
 
     # --- Internal ---
 
@@ -383,7 +514,7 @@ class RoomGuard:
                             direction = 1
                             pause_counter = SCROLL_PAUSE_STEPS
 
-            page = (page + 1) % 3
+            page = (page + 1) % 4
 
     def _lcd_page_line1(self, page: int) -> str:
         """Return the top-line text for the given page."""
@@ -401,6 +532,17 @@ class RoomGuard:
             with self._lock:
                 led = "ON" if self._led_on else "OFF"
             return f"LED: {led}"
+        elif page == 3:
+            # Now Playing page — show current Spotify track or skip
+            try:
+                if self._spotify.is_authenticated():
+                    playback = self._spotify.get_current_playback()
+                    if playback and playback.get("is_playing"):
+                        track = playback["track"]
+                        return f"{track['name']} - {track['artist']}"
+            except Exception:
+                pass
+            return "No music playing"
         return ""
 
     def _lcd_page_line2(self, page: int) -> str:
@@ -414,6 +556,14 @@ class RoomGuard:
             last_short = last.split(" ")[1] if last else "None"
             return f"Last: {last_short}"
         elif page == 2:
+            return now.strftime("%H:%M:%S %d/%m/%y")
+        elif page == 3:
+            try:
+                bt = self._bt_speaker.get_status()
+                if bt.get("connected"):
+                    return f"BT: {bt['device_name'][:12]}"
+            except Exception:
+                pass
             return now.strftime("%H:%M:%S %d/%m/%y")
         return ""
 

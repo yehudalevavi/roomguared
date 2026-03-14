@@ -49,6 +49,7 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 | 13 | IR remote control      | 1   | —           | NEC protocol remote (from Elegoo kit or any NEC remote) |
 | 14 | MFRC522 NFC/RFID reader | 1  | ~$2         | SPI interface, 3.3V — **do not power from 5V** |
 | 15 | NFC cards / key fobs   | 1+  | ~$1         | 13.56 MHz MIFARE tags (included with MFRC522 kits) |
+| 16 | Bluetooth speaker (JBL Flip 7) | 1 | ~$130 | A2DP audio output — any BT speaker works |
 
 ---
 
@@ -589,8 +590,14 @@ IR Remote Control               │    ├── PIR sensor (GPIO 17)      │
                                 │    │   13,6,5,12)                 │
 NFC Cards / Key Fobs            │    ├── NFC reader MFRC522 (SPI0: │
 ┌──────────────┐     13.56 MHz  │    │   GPIO 8,11,10,9,25)        │
-│  💳 Card     │───────────────►│    └── Melody library (20 tunes) │
-│  (MIFARE)    │   MFRC522     │                                   │
+│  💳 Card     │───────────────►│    ├── Melody library (20 tunes) │
+│  (MIFARE)    │   MFRC522     │    ├── BluetoothSpeaker (BlueZ)  │
+└──────────────┘                │    └── SpotifyPlayer (spotipy)   │
+                                │                                   │
+Bluetooth Speaker               │   spotifyd (Spotify Connect)     │
+┌──────────────┐     A2DP      │    └── PulseAudio audio sink     │
+│  🔊 JBL     │◄───────────────│                                   │
+│  Flip 7      │   Bluetooth   │   Spotify Cloud ──► spotifyd     │
 └──────────────┘                └──────────────────────────────────┘
 ```
 

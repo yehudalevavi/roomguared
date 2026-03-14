@@ -24,7 +24,7 @@ class TestIRConfig(unittest.TestCase):
         self.assertEqual(IR_PIN, 18)
 
     def test_elegoo_map_has_four_entries(self):
-        self.assertEqual(len(ELEGOO_SCANCODE_MAP), 4)
+        self.assertEqual(len(ELEGOO_SCANCODE_MAP), 10)
 
     def test_elegoo_map_has_prev_melody(self):
         self.assertIn("prev_melody", ELEGOO_SCANCODE_MAP.values())
@@ -121,6 +121,54 @@ class TestIRRemoteDispatch(unittest.TestCase):
     def test_toggle_arm_exception_handled(self):
         self.guard.toggle_arm.side_effect = RuntimeError("test")
         self.ir._dispatch("toggle_arm")
+
+    def test_spotify_random_calls_guard(self):
+        self.guard.play_random_song.return_value = {"name": "Test Song"}
+        self.ir._dispatch("spotify_random")
+        self.guard.play_random_song.assert_called_once()
+
+    def test_spotify_random_handles_none(self):
+        self.guard.play_random_song.return_value = None
+        self.ir._dispatch("spotify_random")  # should not raise
+
+    def test_spotify_pause_when_playing(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"is_playing": True}
+        self.ir._dispatch("spotify_pause")
+        self.guard.spotify_pause.assert_called_once()
+        self.guard.spotify_resume.assert_not_called()
+
+    def test_spotify_pause_when_paused(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"is_playing": False}
+        self.ir._dispatch("spotify_pause")
+        self.guard.spotify_resume.assert_called_once()
+
+    def test_spotify_next(self):
+        self.ir._dispatch("spotify_next")
+        self.guard.spotify_next.assert_called_once()
+
+    def test_spotify_prev(self):
+        self.ir._dispatch("spotify_prev")
+        self.guard.spotify_prev.assert_called_once()
+
+    def test_volume_up(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"volume_percent": 50}
+        self.ir._dispatch("volume_up")
+        self.guard.spotify_volume.assert_called_once_with(60)
+
+    def test_volume_down(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"volume_percent": 50}
+        self.ir._dispatch("volume_down")
+        self.guard.spotify_volume.assert_called_once_with(40)
+
+    def test_volume_up_caps_at_100(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"volume_percent": 95}
+        self.ir._dispatch("volume_up")
+        self.guard.spotify_volume.assert_called_once_with(100)
 
 
 class TestIRRemoteLifecycle(unittest.TestCase):

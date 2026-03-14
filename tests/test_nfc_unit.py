@@ -258,6 +258,42 @@ class TestNFCReaderDispatch(unittest.TestCase):
         self.nfc._dispatch("toggle_arm", "My Card")
         self.guard._log_message.assert_called()
 
+    def test_play_random_song_dispatches(self):
+        self.guard.play_random_song.return_value = {"name": "Song"}
+        self.nfc._dispatch("play_random_song", "Music Card")
+        self.guard.play_random_song.assert_called_once()
+
+    def test_play_random_song_none_beeps_error(self):
+        self.guard.play_random_song.return_value = None
+        self.nfc._dispatch("play_random_song", "Music Card")
+        self.guard._buzzer.play_tone.assert_called()  # error beep
+
+    def test_spotify_pause_when_playing(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"is_playing": True}
+        self.nfc._dispatch("spotify_pause", "Pause Card")
+        self.guard.spotify_pause.assert_called_once()
+
+    def test_spotify_pause_when_paused_resumes(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.get_current_playback.return_value = {"is_playing": False}
+        self.nfc._dispatch("spotify_pause", "Pause Card")
+        self.guard.spotify_resume.assert_called_once()
+
+    def test_spotify_next_dispatches(self):
+        self.nfc._dispatch("spotify_next", "Next Card")
+        self.guard.spotify_next.assert_called_once()
+
+    def test_spotify_prev_dispatches(self):
+        self.nfc._dispatch("spotify_prev", "Prev Card")
+        self.guard.spotify_prev.assert_called_once()
+
+    def test_play_track_dispatches(self):
+        self.guard._spotify = MagicMock()
+        self.guard._spotify.play_track.return_value = True
+        self.nfc._dispatch("play_track:spotify:track:abc123", "Track Card")
+        self.guard._spotify.play_track.assert_called_once_with("spotify:track:abc123")
+
 
 class TestNFCReaderDebounce(unittest.TestCase):
     """Tests for card debounce logic."""
