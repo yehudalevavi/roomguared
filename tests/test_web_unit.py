@@ -247,6 +247,14 @@ class TestWebApp(unittest.TestCase):
         r = self.client.post("/api/nfc/scan")
         self.assertEqual(r.status_code, 503)
 
+    def test_nfc_scan_start_no_reader(self):
+        r = self.client.post("/api/nfc/scan/start")
+        self.assertEqual(r.status_code, 503)
+
+    def test_nfc_scan_result_no_reader(self):
+        r = self.client.get("/api/nfc/scan/result")
+        self.assertEqual(r.status_code, 503)
+
     def test_nfc_register_no_reader(self):
         r = self.client.post(
             "/api/nfc/register",

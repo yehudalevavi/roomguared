@@ -167,6 +167,7 @@ class NFCReader:
         self._scan_event = threading.Event()
         self._scanned_uid: str | None = None
         self._scan_waiting = False
+        self._scan_deadline: float = 0.0
 
         self._load_config()
 
@@ -218,6 +219,47 @@ class NFCReader:
             return uid
         self._scanned_uid = None
         return None
+
+    def start_scan_mode(self, timeout: float = 15.0) -> None:
+        """Enter scan mode without blocking (non-blocking alternative to wait_for_scan).
+
+        The next card tap will be captured instead of dispatched.
+        Use get_scan_result() to poll for the outcome.
+        """
+        self._scanned_uid = None
+        self._scan_event.clear()
+        self._scan_waiting = True
+        self._scan_deadline = time.monotonic() + timeout
+
+    def get_scan_result(self) -> dict:
+        """Poll for the scan mode result.
+
+        Returns a dict with 'status' key:
+          - 'waiting'  — still waiting for a card
+          - 'found'    — card detected, includes 'uid'
+          - 'timeout'  — deadline passed with no card
+          - 'idle'     — scan mode not active
+        """
+        if self._scan_event.is_set() and self._scanned_uid:
+            uid = self._scanned_uid
+            self._scanned_uid = None
+            self._scan_waiting = False
+            return {"status": "found", "uid": uid}
+
+        if not self._scan_waiting:
+            return {"status": "idle"}
+
+        if time.monotonic() > self._scan_deadline:
+            self._scan_waiting = False
+            self._scanned_uid = None
+            return {"status": "timeout"}
+
+        return {"status": "waiting"}
+
+    def cancel_scan(self) -> None:
+        """Cancel an active scan mode."""
+        self._scan_waiting = False
+        self._scanned_uid = None
 
     def register_card(self, uid: str, action: str, label: str = "") -> None:
         """Add or update a card mapping and persist to config file."""

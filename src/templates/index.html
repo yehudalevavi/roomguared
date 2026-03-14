@@ -567,18 +567,39 @@ async function startNfcScan() {
   _nfcScannedUid = null;
 
   try {
-    const r = await fetch(API + '/api/nfc/scan', {
+    // Start scan mode (returns immediately)
+    const startRes = await fetch(API + '/api/nfc/scan/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timeout: 15 })
     });
-    const d = await r.json();
-    if (d.ok) {
-      _nfcScannedUid = d.uid;
-      uidEl.textContent = `✅ ${t('nfc_scan_ok')} UID: ${d.uid}`;
-      uidEl.style.display = 'block';
-      regBtn.style.display = 'flex';
-    } else {
+    const startData = await startRes.json();
+    if (!startData.ok) {
+      errEl.textContent = startData.error || 'NFC not available';
+      errEl.style.display = 'block';
+      scanBtn.disabled = false;
+      scanBtn.innerHTML = `<span>📡</span> <span>${t('nfc_scan')}</span>`;
+      scanBtn.className = 'btn btn-blue';
+      return;
+    }
+
+    // Poll for result every 500ms, up to 30 attempts (15s)
+    let found = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      const pollRes = await fetch(API + '/api/nfc/scan/result');
+      const pollData = await pollRes.json();
+      if (pollData.status === 'found') {
+        _nfcScannedUid = pollData.uid;
+        uidEl.textContent = `✅ ${t('nfc_scan_ok')} UID: ${pollData.uid}`;
+        uidEl.style.display = 'block';
+        regBtn.style.display = 'flex';
+        found = true;
+        break;
+      }
+      if (pollData.status === 'timeout' || pollData.status === 'idle') break;
+    }
+    if (!found) {
       errEl.textContent = t('nfc_scan_timeout');
       errEl.style.display = 'block';
     }

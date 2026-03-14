@@ -186,6 +186,26 @@ def api_nfc_scan():
     return jsonify({"ok": True, "uid": uid})
 
 
+@app.route("/api/nfc/scan/start", methods=["POST"])
+def api_nfc_scan_start():
+    """Enter scan mode without blocking. Poll /api/nfc/scan/result for outcome."""
+    if nfc_reader is None:
+        return jsonify({"ok": False, "error": "NFC reader not available"}), 503
+    data = request.get_json(silent=True) or {}
+    timeout = min(data.get("timeout", 15), 30)
+    nfc_reader.start_scan_mode(timeout=timeout)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/nfc/scan/result")
+def api_nfc_scan_result():
+    """Poll for the result of an active scan mode."""
+    if nfc_reader is None:
+        return jsonify({"ok": False, "error": "NFC reader not available"}), 503
+    result = nfc_reader.get_scan_result()
+    return jsonify({"ok": True, **result})
+
+
 @app.route("/api/nfc/cards/<path:uid>", methods=["DELETE"])
 def api_nfc_remove(uid):
     """Remove a registered NFC card."""

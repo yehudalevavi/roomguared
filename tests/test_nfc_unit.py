@@ -375,6 +375,65 @@ class TestNFCReaderScanMode(unittest.TestCase):
         self.guard.prev_melody.assert_called_once()
 
 
+class TestNFCNonBlockingScan(unittest.TestCase):
+    """Tests for the non-blocking scan API (start_scan_mode / get_scan_result)."""
+
+    def setUp(self):
+        self.config_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        )
+        json.dump({"cards": []}, self.config_file)
+        self.config_file.close()
+        self.guard = MagicMock()
+        self.guard._lock = MagicMock()
+        self.guard._buzzer = MagicMock()
+        self.nfc = NFCReader(self.guard, config_path=self.config_file.name)
+
+    def tearDown(self):
+        os.unlink(self.config_file.name)
+
+    def test_idle_before_start(self):
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "idle")
+
+    def test_waiting_after_start(self):
+        self.nfc.start_scan_mode(timeout=5.0)
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "waiting")
+
+    def test_found_after_card_tap(self):
+        self.nfc.start_scan_mode(timeout=5.0)
+        self.nfc._handle_card("0xABCD1234")
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "found")
+        self.assertEqual(result["uid"], "0xABCD1234")
+
+    def test_idle_after_result_consumed(self):
+        self.nfc.start_scan_mode(timeout=5.0)
+        self.nfc._handle_card("0xABCD1234")
+        self.nfc.get_scan_result()  # consume
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "idle")
+
+    @patch("nfc_reader.time")
+    def test_timeout_after_deadline(self, mock_time):
+        mock_time.monotonic.side_effect = [100.0, 116.0]
+        self.nfc.start_scan_mode(timeout=5.0)
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "timeout")
+
+    def test_cancel_scan(self):
+        self.nfc.start_scan_mode(timeout=5.0)
+        self.nfc.cancel_scan()
+        result = self.nfc.get_scan_result()
+        self.assertEqual(result["status"], "idle")
+
+    def test_scan_mode_does_not_dispatch(self):
+        self.nfc.start_scan_mode(timeout=5.0)
+        self.nfc._handle_card("0xABCD1234")
+        self.guard.toggle_arm.assert_not_called()
+
+
 class TestNFCReaderLifecycle(unittest.TestCase):
     """Tests for start/stop lifecycle."""
 
