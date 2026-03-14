@@ -316,6 +316,65 @@ class TestNFCReaderDebounce(unittest.TestCase):
         self.assertEqual(scan2["uid"], "0xABCD1234")
 
 
+class TestNFCReaderScanMode(unittest.TestCase):
+    """Tests for scan-to-register mode."""
+
+    def setUp(self):
+        self.config_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        )
+        json.dump({"cards": [
+            {"uid": "0xEXISTING", "action": "toggle_arm", "label": "Existing"},
+        ]}, self.config_file)
+        self.config_file.close()
+        self.guard = MagicMock()
+        self.guard._lock = MagicMock()
+        self.guard._buzzer = MagicMock()
+        self.nfc = NFCReader(self.guard, config_path=self.config_file.name)
+
+    def tearDown(self):
+        os.unlink(self.config_file.name)
+
+    def test_scan_captures_uid(self):
+        import threading
+        def tap_card():
+            import time
+            time.sleep(0.1)
+            self.nfc._handle_card("0xNEWCARD")
+        threading.Thread(target=tap_card, daemon=True).start()
+        uid = self.nfc.wait_for_scan(timeout=2.0)
+        self.assertEqual(uid, "0xNEWCARD")
+
+    def test_scan_returns_none_on_timeout(self):
+        uid = self.nfc.wait_for_scan(timeout=0.2)
+        self.assertIsNone(uid)
+
+    def test_scan_mode_does_not_dispatch(self):
+        import threading
+        def tap_card():
+            import time
+            time.sleep(0.1)
+            self.nfc._handle_card("0xEXISTING")
+        threading.Thread(target=tap_card, daemon=True).start()
+        uid = self.nfc.wait_for_scan(timeout=2.0)
+        self.assertEqual(uid, "0xEXISTING")
+        # Should NOT have dispatched toggle_arm
+        self.guard.toggle_arm.assert_not_called()
+
+    def test_is_scanning_false_by_default(self):
+        self.assertFalse(self.nfc.is_scanning)
+
+    def test_dispatch_next_melody(self):
+        self.guard.next_melody.return_value = "Ode to Joy"
+        self.nfc._dispatch("next_melody", "Test")
+        self.guard.next_melody.assert_called_once()
+
+    def test_dispatch_prev_melody(self):
+        self.guard.prev_melody.return_value = "Für Elise"
+        self.nfc._dispatch("prev_melody", "Test")
+        self.guard.prev_melody.assert_called_once()
+
+
 class TestNFCReaderLifecycle(unittest.TestCase):
     """Tests for start/stop lifecycle."""
 

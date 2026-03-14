@@ -61,6 +61,11 @@ class NFCReader:
         self._last_scan: dict | None = None
         self._lock = threading.Lock()
 
+        # Scan mode: when active, next card tap is captured instead of dispatched
+        self._scan_event = threading.Event()
+        self._scanned_uid: str | None = None
+        self._scan_waiting = False
+
         self._load_config()
 
     def start(self) -> None:
@@ -91,6 +96,31 @@ class NFCReader:
         """Return the last scanned card info, or None."""
         with self._lock:
             return dict(self._last_scan) if self._last_scan else None
+
+    @property
+    def is_scanning(self) -> bool:
+        """True if the reader is in scan-to-register mode."""
+        return not self._scan_event.is_set() and self._scanned_uid is None and self._scan_waiting
+
+    def wait_for_scan(self, timeout: float = 15.0) -> str | None:
+        """Enter scan mode: wait for the next card tap and return its UID.
+
+        While in scan mode, detected cards are captured instead of dispatched.
+        Returns the UID string, or None on timeout.
+        """
+        self._scanned_uid = None
+        self._scan_event.clear()
+        self._scan_waiting = True
+        try:
+            got_card = self._scan_event.wait(timeout=timeout)
+        finally:
+            self._scan_waiting = False
+        if got_card and self._scanned_uid:
+            uid = self._scanned_uid
+            self._scanned_uid = None
+            return uid
+        self._scanned_uid = None
+        return None
 
     def register_card(self, uid: str, action: str, label: str = "") -> None:
         """Add or update a card mapping and persist to config file."""
@@ -169,6 +199,14 @@ class NFCReader:
         with self._lock:
             self._last_scan = {"uid": uid, "time": scan_time}
 
+        # Scan-to-register mode: capture UID instead of dispatching
+        if self._scan_waiting:
+            self._scanned_uid = uid
+            self._scan_event.set()
+            self._beep_confirm()
+            print(f"[NFC Reader] Scan captured: {uid}")
+            return
+
         # Look up action
         action = None
         label = uid
@@ -206,6 +244,12 @@ class NFCReader:
             elif action == "stop_melody":
                 self._guard.stop_melody()
                 self._beep_confirm()
+            elif action == "next_melody":
+                name = self._guard.next_melody()
+                print(f"[NFC Reader] Next: {name}")
+            elif action == "prev_melody":
+                name = self._guard.prev_melody()
+                print(f"[NFC Reader] Prev: {name}")
             else:
                 print(f"[NFC Reader] Unknown action: {action}")
                 self._beep_error()

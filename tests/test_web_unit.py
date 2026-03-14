@@ -237,6 +237,30 @@ class TestWebApp(unittest.TestCase):
         self.assertTrue(d["ok"])
         self.assertIn("armed", d)
 
+    def test_nfc_cards_no_reader(self):
+        r = self.client.get("/api/nfc/cards")
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertFalse(d["available"])
+
+    def test_nfc_scan_no_reader(self):
+        r = self.client.post("/api/nfc/scan")
+        self.assertEqual(r.status_code, 503)
+
+    def test_nfc_register_no_reader(self):
+        r = self.client.post(
+            "/api/nfc/register",
+            data=json.dumps({"uid": "0x123", "action": "toggle_arm"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 503)
+
+    def test_nfc_last_scan_no_reader(self):
+        r = self.client.get("/api/nfc/last-scan")
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertFalse(d["available"])
+
 
 class TestRoomGuardClass(unittest.TestCase):
     """Tests for the RoomGuard class logic (no hardware)."""

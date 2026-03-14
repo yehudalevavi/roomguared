@@ -165,11 +165,25 @@ def api_nfc_register():
     label = data.get("label", "").strip()
     if not uid or not action:
         return jsonify({"ok": False, "error": "uid and action are required"}), 400
-    valid_actions = ["toggle_arm", "toggle_led", "play_random", "stop_melody"]
+    valid_actions = ["toggle_arm", "toggle_led", "play_random", "stop_melody",
+                     "next_melody", "prev_melody"]
     if action not in valid_actions and not action.startswith("play_melody:"):
         return jsonify({"ok": False, "error": f"Invalid action. Valid: {valid_actions} or play_melody:<name>"}), 400
     nfc_reader.register_card(uid, action, label)
     return jsonify({"ok": True, "uid": uid, "action": action, "label": label})
+
+
+@app.route("/api/nfc/scan", methods=["POST"])
+def api_nfc_scan():
+    """Enter scan mode: wait for the next card tap and return its UID."""
+    if nfc_reader is None:
+        return jsonify({"ok": False, "error": "NFC reader not available"}), 503
+    data = request.get_json(silent=True) or {}
+    timeout = min(data.get("timeout", 15), 30)
+    uid = nfc_reader.wait_for_scan(timeout=timeout)
+    if uid is None:
+        return jsonify({"ok": False, "error": "No card detected (timeout)"}), 408
+    return jsonify({"ok": True, "uid": uid})
 
 
 @app.route("/api/nfc/cards/<path:uid>", methods=["DELETE"])
