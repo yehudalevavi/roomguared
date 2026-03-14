@@ -239,14 +239,14 @@ class BluetoothSpeaker:
             if not self._connected:
                 return False
 
-        # Try sox with PulseAudio output (generates a pleasant three-tone gling)
+        # Try sox with PulseAudio output (gentle two-note chime)
         try:
             subprocess.run(
                 ["play", "-qn", "-t", "pulseaudio",
-                 "synth", "0.15", "sin", "880",
-                 "synth", "0.15", "sin", "1318.5",
-                 "synth", "0.2", "sin", "1760",
-                 "gain", "-10"],
+                 "synth", "0.25", "pluck", "659.3",
+                 "synth", "0.35", "pluck", "880",
+                 "delay", "0", "0.3",
+                 "remix", "-", "gain", "-18"],
                 capture_output=True, timeout=5,
             )
             print("[Bluetooth] Test sound played (sox/pulse)")
