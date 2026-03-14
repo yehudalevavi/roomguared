@@ -239,16 +239,17 @@ class BluetoothSpeaker:
             if not self._connected:
                 return False
 
-        # Try sox (generates a pleasant two-tone gling)
+        # Try sox with PulseAudio output (generates a pleasant three-tone gling)
         try:
             subprocess.run(
-                ["play", "-qn", "synth", "0.15", "sin", "880",
+                ["play", "-qn", "-t", "pulseaudio",
+                 "synth", "0.15", "sin", "880",
                  "synth", "0.15", "sin", "1318.5",
                  "synth", "0.2", "sin", "1760",
                  "gain", "-10"],
                 capture_output=True, timeout=5,
             )
-            print("[Bluetooth] Test sound played (sox)")
+            print("[Bluetooth] Test sound played (sox/pulse)")
             return True
         except FileNotFoundError:
             pass
