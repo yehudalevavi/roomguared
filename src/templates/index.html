@@ -218,6 +218,10 @@
         <option value="stop_melody" data-i18n="nfc_action_stop">עצור מנגינה</option>
         <option value="next_melody" data-i18n="nfc_action_next">מנגינה הבאה</option>
         <option value="prev_melody" data-i18n="nfc_action_prev">מנגינה קודמת</option>
+        <option value="play_random_song" data-i18n="nfc_action_spotify_random">🎧 נגן שיר אקראי (Spotify)</option>
+        <option value="spotify_pause" data-i18n="nfc_action_spotify_pause">🎧 השהה/המשך (Spotify)</option>
+        <option value="spotify_next" data-i18n="nfc_action_spotify_next">🎧 שיר הבא (Spotify)</option>
+        <option value="spotify_prev" data-i18n="nfc_action_spotify_prev">🎧 שיר קודם (Spotify)</option>
       </select>
       <div id="nfcError" style="color:var(--red);font-size:0.85rem;margin-bottom:8px;display:none;"></div>
       <button class="btn btn-blue" id="nfcRegisterBtn" onclick="registerNfcCard()" style="display:none;">
@@ -226,6 +230,91 @@
     </div>
   </details>
   <div id="nfcLastScan" style="font-size:0.8rem;color:var(--muted);margin-top:10px;"></div>
+</div>
+
+<!-- Bluetooth Speaker -->
+<div class="card">
+  <div class="card-title"><span class="card-icon">🔊</span> <span data-i18n="bt_speaker">רמקול בלוטות׳</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span data-i18n="bt_connection">חיבור</span>
+    <span class="badge badge-muted" id="btBadge">—</span>
+  </div>
+  <div id="btDeviceName" style="font-size:0.9rem;color:var(--muted);margin-bottom:10px;"></div>
+  <div id="btControls">
+    <button class="btn btn-blue" id="btScanBtn" onclick="btScan()" style="margin-bottom:8px;">
+      <span>🔍</span> <span data-i18n="bt_scan">סרוק מכשירים</span>
+    </button>
+    <div id="btDeviceList" style="margin-bottom:8px;"></div>
+    <button class="btn btn-red" id="btDisconnectBtn" onclick="btDisconnect()" style="display:none;">
+      <span>🔌</span> <span data-i18n="bt_disconnect">נתק</span>
+    </button>
+    <button class="btn" id="btTestSoundBtn" onclick="btTestSound()" style="display:none;">
+      <span>🔔</span> <span data-i18n="bt_test_sound">בדיקת צליל</span>
+    </button>
+  </div>
+</div>
+
+<!-- Spotify -->
+<div class="card">
+  <div class="card-title"><span class="card-icon">🎧</span> <span>Spotify</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span data-i18n="spotify_status_label">סטטוס</span>
+    <span class="badge badge-muted" id="spotifyBadge">—</span>
+  </div>
+
+  <!-- Credentials form (shown when not configured) -->
+  <div id="spotifySetup" style="display:none;">
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px;" data-i18n="spotify_setup_hint">הזן פרטי אפליקציית Spotify Developer:</p>
+    <input type="text" id="spotifyClientId" placeholder="Client ID" style="width:100%;padding:10px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.95rem;margin-bottom:6px;">
+    <input type="password" id="spotifyClientSecret" placeholder="Client Secret" style="width:100%;padding:10px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.95rem;margin-bottom:8px;">
+    <button class="btn btn-blue" onclick="saveSpotifyCredentials()">
+      <span>💾</span> <span data-i18n="spotify_save_creds">שמור</span>
+    </button>
+  </div>
+
+  <!-- Auth area (shown when configured but not authenticated) -->
+  <div id="spotifyAuthArea" style="display:none;margin-top:8px;">
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px;" data-i18n="spotify_auth_hint">לחץ כדי לפתוח את דף ההרשאה של Spotify, אשר, ואז הדבק את הכתובת שאליה הועברת:</p>
+    <button class="btn btn-green" onclick="connectSpotify()" style="margin-bottom:8px;">
+      <span>🔗</span> <span data-i18n="spotify_open_auth">פתח דף הרשאה</span>
+    </button>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="spotifyCallbackUrl" placeholder="http://localhost:5000/api/spotify/callback?code=..." style="flex:1;padding:10px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.85rem;" dir="ltr">
+      <button class="btn btn-blue" onclick="submitSpotifyCallback()">
+        <span>✓</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Now Playing (shown when authenticated) -->
+  <div id="spotifyPlayer" style="display:none;">
+    <div id="nowPlayingInfo" style="text-align:center;margin-bottom:12px;">
+      <div id="npAlbumArt" style="margin-bottom:8px;"></div>
+      <div id="npTrackName" style="font-weight:700;font-size:1.1rem;">—</div>
+      <div id="npArtist" style="color:var(--muted);font-size:0.9rem;">—</div>
+    </div>
+
+    <!-- Transport controls -->
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-off" onclick="spotifyAction('prev')" style="flex:0 0 auto;min-width:48px;padding:12px;">⏮</button>
+      <button class="btn btn-off" id="spotifyPlayPauseBtn" onclick="spotifyPlayPause()" style="flex:0 0 auto;min-width:48px;padding:12px;">⏯</button>
+      <button class="btn btn-off" onclick="spotifyAction('next')" style="flex:0 0 auto;min-width:48px;padding:12px;">⏭</button>
+    </div>
+
+    <!-- Volume slider -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:0.85rem;">🔈</span>
+      <input type="range" id="spotifyVolume" min="0" max="100" value="50"
+             style="flex:1;accent-color:var(--green);"
+             onchange="setSpotifyVolume(this.value)">
+      <span style="font-size:0.85rem;">🔊</span>
+    </div>
+
+    <!-- Play Random -->
+    <button class="btn btn-green" onclick="playRandomSong()" style="width:100%;">
+      <span>🎲</span> <span data-i18n="spotify_play_random">נגן שיר אקראי</span>
+    </button>
+  </div>
 </div>
 
 <!-- Logs -->
@@ -296,6 +385,29 @@ const LANG = {
     nfc_scanning: 'מחכה לכרטיס... הצמד כרטיס לקורא',
     nfc_scan_ok: 'כרטיס נסרק!',
     nfc_scan_timeout: 'לא זוהה כרטיס — נסה שוב',
+    bt_speaker: 'רמקול בלוטות׳',
+    bt_connection: 'חיבור',
+    bt_scan: 'סרוק מכשירים',
+    bt_disconnect: 'נתק',
+    bt_test_sound: 'בדיקת צליל',
+    bt_scanning: 'סורק...',
+    bt_connected: '● מחובר',
+    bt_disconnected: '○ מנותק',
+    bt_pair_connect: 'חבר',
+    spotify_status_label: 'סטטוס',
+    spotify_setup_hint: 'הזן פרטי אפליקציית Spotify Developer:',
+    spotify_save_creds: 'שמור',
+    spotify_connect: 'התחבר ל-Spotify',
+    spotify_open_auth: 'פתח דף הרשאה',
+    spotify_auth_hint: 'לחץ כדי לפתוח את דף ההרשאה של Spotify, אשר, ואז הדבק את הכתובת שאליה הועברת:',
+    spotify_connected: '● מחובר',
+    spotify_not_connected: '○ לא מחובר',
+    spotify_not_configured: 'לא מוגדר',
+    spotify_play_random: 'נגן שיר אקראי',
+    nfc_action_spotify_random: '🎧 נגן שיר אקראי (Spotify)',
+    nfc_action_spotify_pause: '🎧 השהה/המשך (Spotify)',
+    nfc_action_spotify_next: '🎧 שיר הבא (Spotify)',
+    nfc_action_spotify_prev: '🎧 שיר קודם (Spotify)',
   },
   en: {
     title: 'Room Guard',
@@ -346,6 +458,29 @@ const LANG = {
     nfc_scanning: 'Waiting for card... hold it near the reader',
     nfc_scan_ok: 'Card scanned!',
     nfc_scan_timeout: 'No card detected — try again',
+    bt_speaker: 'Bluetooth Speaker',
+    bt_connection: 'Connection',
+    bt_scan: 'Scan Devices',
+    bt_disconnect: 'Disconnect',
+    bt_test_sound: 'Test Sound',
+    bt_scanning: 'Scanning...',
+    bt_connected: '● Connected',
+    bt_disconnected: '○ Disconnected',
+    bt_pair_connect: 'Connect',
+    spotify_status_label: 'Status',
+    spotify_setup_hint: 'Enter your Spotify Developer App credentials:',
+    spotify_save_creds: 'Save',
+    spotify_connect: 'Connect Spotify',
+    spotify_open_auth: 'Open Auth Page',
+    spotify_auth_hint: 'Click to open Spotify authorization, approve, then paste the URL you were redirected to:',
+    spotify_connected: '● Connected',
+    spotify_not_connected: '○ Not Connected',
+    spotify_not_configured: 'Not Configured',
+    spotify_play_random: 'Play Random Song',
+    nfc_action_spotify_random: '🎧 Play random song (Spotify)',
+    nfc_action_spotify_pause: '🎧 Pause/Resume (Spotify)',
+    nfc_action_spotify_next: '🎧 Next track (Spotify)',
+    nfc_action_spotify_prev: '🎧 Previous track (Spotify)',
   }
 };
 
@@ -502,11 +637,16 @@ const NFC_ACTION_LABELS = {
   stop_melody: () => t('nfc_action_stop'),
   next_melody: () => t('nfc_action_next'),
   prev_melody: () => t('nfc_action_prev'),
+  play_random_song: () => t('nfc_action_spotify_random'),
+  spotify_pause: () => t('nfc_action_spotify_pause'),
+  spotify_next: () => t('nfc_action_spotify_next'),
+  spotify_prev: () => t('nfc_action_spotify_prev'),
 };
 
 function nfcActionLabel(action) {
   if (NFC_ACTION_LABELS[action]) return NFC_ACTION_LABELS[action]();
   if (action.startsWith('play_melody:')) return '🎶 ' + action.split(':')[1];
+  if (action.startsWith('play_track:')) return '🎧 ' + action.split(':').slice(1).join(':');
   return action;
 }
 
@@ -650,17 +790,242 @@ async function removeNfcCard(uid) {
   } catch(e) { console.error(e); }
 }
 
+// ── Bluetooth Speaker ──
+
+async function refreshBtStatus() {
+  try {
+    const r = await fetch(API + '/api/bluetooth/status');
+    const d = await r.json();
+    const badge = document.getElementById('btBadge');
+    const nameEl = document.getElementById('btDeviceName');
+    const disconnBtn = document.getElementById('btDisconnectBtn');
+    const testSndBtn = document.getElementById('btTestSoundBtn');
+
+    if (d.connected) {
+      badge.textContent = t('bt_connected');
+      badge.className = 'badge badge-green';
+      nameEl.textContent = d.device_name || d.device_address || '';
+      disconnBtn.style.display = '';
+      testSndBtn.style.display = '';
+    } else {
+      badge.textContent = t('bt_disconnected');
+      badge.className = 'badge badge-muted';
+      nameEl.textContent = d.device_name ? (d.device_name + ' (disconnected)') : '';
+      disconnBtn.style.display = 'none';
+      testSndBtn.style.display = 'none';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function btScan() {
+  const btn = document.getElementById('btScanBtn');
+  const listEl = document.getElementById('btDeviceList');
+  btn.disabled = true;
+  btn.innerHTML = `<span>🔍</span> <span>${t('bt_scanning')}</span>`;
+  listEl.innerHTML = '';
+  try {
+    const r = await fetch(API + '/api/bluetooth/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({timeout: 10})
+    });
+    const d = await r.json();
+    if (d.devices && d.devices.length > 0) {
+      listEl.innerHTML = d.devices.map(dev =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;margin-bottom:4px;">
+          <span style="font-size:0.9rem;">${dev.name || dev.address}${dev.paired ? ' ✓' : ''}</span>
+          <button class="btn btn-blue" style="padding:6px 14px;font-size:0.8rem;" onclick="btConnect('${dev.address}')">
+            ${t('bt_pair_connect')}
+          </button>
+        </div>`
+      ).join('');
+    } else {
+      listEl.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">No devices found</div>';
+    }
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:var(--red);font-size:0.85rem;">Scan failed</div>';
+  }
+  btn.disabled = false;
+  btn.innerHTML = `<span>🔍</span> <span>${t('bt_scan')}</span>`;
+}
+
+async function btConnect(address) {
+  try {
+    await fetch(API + '/api/bluetooth/pair', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({address})
+    });
+    refreshBtStatus();
+    document.getElementById('btDeviceList').innerHTML = '';
+  } catch(e) { console.error(e); }
+}
+
+async function btDisconnect() {
+  try {
+    await fetch(API + '/api/bluetooth/disconnect', { method: 'POST' });
+    refreshBtStatus();
+  } catch(e) { console.error(e); }
+}
+
+async function btTestSound() {
+  try {
+    const r = await fetch(API + '/api/bluetooth/test-sound', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) alert(d.error || 'Test sound failed');
+  } catch(e) { console.error(e); }
+}
+
+// ── Spotify ──
+
+let _spotifyPlaying = false;
+
+async function refreshSpotifyStatus() {
+  try {
+    const r = await fetch(API + '/api/spotify/status');
+    const d = await r.json();
+    const badge = document.getElementById('spotifyBadge');
+    const setupEl = document.getElementById('spotifySetup');
+    const authEl = document.getElementById('spotifyAuthArea');
+    const playerEl = document.getElementById('spotifyPlayer');
+
+    if (d.authenticated) {
+      badge.textContent = t('spotify_connected');
+      badge.className = 'badge badge-green';
+      setupEl.style.display = 'none';
+      authEl.style.display = 'none';
+      playerEl.style.display = '';
+
+      // Update now playing
+      if (d.playback) {
+        const tk = d.playback.track;
+        document.getElementById('npTrackName').textContent = tk.name || '—';
+        document.getElementById('npArtist').textContent = tk.artist || '—';
+        if (tk.album_art) {
+          document.getElementById('npAlbumArt').innerHTML =
+            `<img src="${tk.album_art}" style="width:100px;height:100px;border-radius:12px;object-fit:cover;">`;
+        }
+        _spotifyPlaying = d.playback.is_playing;
+        document.getElementById('spotifyVolume').value = d.playback.volume_percent || 50;
+      } else {
+        document.getElementById('npTrackName').textContent = '—';
+        document.getElementById('npArtist').textContent = '—';
+        document.getElementById('npAlbumArt').innerHTML = '';
+        _spotifyPlaying = false;
+      }
+    } else if (d.configured) {
+      badge.textContent = t('spotify_not_connected');
+      badge.className = 'badge badge-muted';
+      setupEl.style.display = 'none';
+      authEl.style.display = '';
+      playerEl.style.display = 'none';
+    } else {
+      badge.textContent = t('spotify_not_configured');
+      badge.className = 'badge badge-muted';
+      setupEl.style.display = '';
+      authEl.style.display = 'none';
+      playerEl.style.display = 'none';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function saveSpotifyCredentials() {
+  const clientId = document.getElementById('spotifyClientId').value.trim();
+  const clientSecret = document.getElementById('spotifyClientSecret').value.trim();
+  if (!clientId || !clientSecret) return;
+  try {
+    await fetch(API + '/api/spotify/credentials', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({client_id: clientId, client_secret: clientSecret})
+    });
+    refreshSpotifyStatus();
+  } catch(e) { console.error(e); }
+}
+
+async function connectSpotify() {
+  try {
+    const r = await fetch(API + '/api/spotify/auth');
+    const d = await r.json();
+    if (d.auth_url) window.open(d.auth_url, '_blank');
+  } catch(e) { console.error(e); }
+}
+
+async function submitSpotifyCallback() {
+  const url = document.getElementById('spotifyCallbackUrl').value.trim();
+  if (!url) return;
+  try {
+    const r = await fetch(API + '/api/spotify/auth-url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('spotifyCallbackUrl').value = '';
+      refreshSpotifyStatus();
+    } else {
+      alert(d.error || 'Auth failed');
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function playRandomSong() {
+  try {
+    const r = await fetch(API + '/api/spotify/play-random', { method: 'POST' });
+    const d = await r.json();
+    if (d.track) {
+      document.getElementById('npTrackName').textContent = d.track.name;
+      document.getElementById('npArtist').textContent = d.track.artist;
+      if (d.track.album_art) {
+        document.getElementById('npAlbumArt').innerHTML =
+          `<img src="${d.track.album_art}" style="width:100px;height:100px;border-radius:12px;object-fit:cover;">`;
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function spotifyPlayPause() {
+  if (_spotifyPlaying) {
+    await fetch(API + '/api/spotify/pause', { method: 'POST' });
+  } else {
+    await fetch(API + '/api/spotify/resume', { method: 'POST' });
+  }
+  _spotifyPlaying = !_spotifyPlaying;
+}
+
+async function spotifyAction(action) {
+  try {
+    await fetch(API + '/api/spotify/' + action, { method: 'POST' });
+    setTimeout(refreshSpotifyStatus, 500);
+  } catch(e) { console.error(e); }
+}
+
+async function setSpotifyVolume(percent) {
+  try {
+    await fetch(API + '/api/spotify/volume', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({percent: parseInt(percent)})
+    });
+  } catch(e) { console.error(e); }
+}
+
 // Initial load
 applyLang();
 loadMelodies();
 refreshStatus();
 refreshLogs();
 refreshNfcCards();
+refreshBtStatus();
+refreshSpotifyStatus();
 
 // Auto-refresh
 setInterval(refreshStatus, 3000);
 setInterval(refreshLogs, 5000);
 setInterval(refreshNfcCards, 10000);
+setInterval(refreshBtStatus, 5000);
+setInterval(refreshSpotifyStatus, 3000);
 </script>
 </body>
 </html>
