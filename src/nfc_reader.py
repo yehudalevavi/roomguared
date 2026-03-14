@@ -130,7 +130,7 @@ def _install_gpio_shim():
     sys.modules["RPi"] = rpi_module
     sys.modules["RPi.GPIO"] = GPIOShim
 DEBOUNCE_SECONDS = 2.0  # Ignore same card re-taps within this window
-POLL_INTERVAL = 0.3  # Seconds between card polls
+POLL_INTERVAL = 0.5  # Seconds between card polls
 DEFAULT_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "config", "nfc_cards.json"
