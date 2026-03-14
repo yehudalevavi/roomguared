@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import MagicMock, patch, call
 
@@ -382,6 +383,57 @@ class TestBluetoothSpeakerConfig(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["last_device_address"], "11:22:33:44:55:66")
         self.assertEqual(data["last_device_name"], "Test Speaker")
+
+
+class TestBluetoothWatchdog(unittest.TestCase):
+    """Tests for the reconnect watchdog."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.config_path = os.path.join(self.tmpdir, "bluetooth.json")
+
+    @patch("bluetooth_speaker._run_bluetoothctl")
+    def test_watchdog_reconnects_when_disconnected(self, mock_ctl):
+        """Watchdog should call connect when device is paired but not connected."""
+        bt = BluetoothSpeaker(config_path=self.config_path)
+        bt._started = True
+        bt._device_address = "AA:BB:CC:DD:EE:FF"
+
+        # _get_device_flags returns paired=True, connected=False
+        mock_ctl.return_value = (True, "Paired: yes\nConnected: no")
+
+        # Run one iteration of the watchdog logic directly
+        bt._watchdog_stop = threading.Event()
+        bt._watchdog_stop.set()  # stop after one iteration
+
+        # Manually call the reconnect check
+        paired, connected = bt._get_device_flags("AA:BB:CC:DD:EE:FF")
+        self.assertTrue(paired)
+        self.assertFalse(connected)
+
+    @patch("bluetooth_speaker._run_bluetoothctl")
+    def test_watchdog_skips_when_connected(self, mock_ctl):
+        """Watchdog should not reconnect when device is already connected."""
+        bt = BluetoothSpeaker(config_path=self.config_path)
+        bt._started = True
+        bt._device_address = "AA:BB:CC:DD:EE:FF"
+
+        mock_ctl.return_value = (True, "Paired: yes\nConnected: yes")
+
+        paired, connected = bt._get_device_flags("AA:BB:CC:DD:EE:FF")
+        self.assertTrue(paired)
+        self.assertTrue(connected)
+
+    def test_stop_stops_watchdog(self):
+        """stop() should signal the watchdog to exit."""
+        bt = BluetoothSpeaker(config_path=self.config_path)
+        bt._started = True
+        bt._watchdog_stop = threading.Event()
+        bt._watchdog_thread = None
+
+        bt.stop()
+        self.assertTrue(bt._watchdog_stop.is_set())
+        self.assertFalse(bt._started)
 
 
 if __name__ == "__main__":

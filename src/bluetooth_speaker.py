@@ -27,6 +27,7 @@ DEFAULT_CONFIG_PATH = os.path.join(
 
 SCAN_TIMEOUT = 15  # seconds
 CONNECT_TIMEOUT = 10  # seconds
+WATCHDOG_INTERVAL = 15  # seconds between reconnect checks
 
 
 def _run_bluetoothctl(*args, timeout=10):
@@ -62,6 +63,8 @@ class BluetoothSpeaker:
         self._device_name = None
         self._lock = threading.Lock()
         self._started = False
+        self._watchdog_thread = None
+        self._watchdog_stop = threading.Event()
 
     def start(self) -> None:
         """Initialize Bluetooth controller and attempt auto-connect."""
@@ -75,10 +78,14 @@ class BluetoothSpeaker:
         # Ensure the BT adapter is powered on
         _run_bluetoothctl("power", "on")
         self._load_config()
+        self._start_watchdog()
         print("[Bluetooth] Started")
 
     def stop(self) -> None:
         """Clean up Bluetooth state."""
+        self._watchdog_stop.set()
+        if self._watchdog_thread and self._watchdog_thread.is_alive():
+            self._watchdog_thread.join(timeout=WATCHDOG_INTERVAL + 5)
         self._started = False
         print("[Bluetooth] Stopped")
 
@@ -385,3 +392,34 @@ class BluetoothSpeaker:
                 json.dump(data, f, indent=2)
         except OSError as e:
             print(f"[Bluetooth] WARNING: Could not save config: {e}")
+
+    # ------------------------------------------------------------------
+    # Reconnect watchdog
+    # ------------------------------------------------------------------
+
+    def _start_watchdog(self) -> None:
+        """Start the background reconnect watchdog thread."""
+        self._watchdog_stop.clear()
+        self._watchdog_thread = threading.Thread(
+            target=self._watchdog_loop, daemon=True, name="bt-watchdog"
+        )
+        self._watchdog_thread.start()
+
+    def _watchdog_loop(self) -> None:
+        """Periodically check connection and reconnect if needed."""
+        # Wait a bit on startup so auto_connect gets first shot
+        self._watchdog_stop.wait(30)
+
+        while not self._watchdog_stop.is_set():
+            try:
+                with self._lock:
+                    address = self._device_address
+                if address:
+                    paired, connected = self._get_device_flags(address)
+                    if paired and not connected:
+                        print(f"[Bluetooth] Watchdog: device {address} paired but not connected — reconnecting...")
+                        self.connect(address)
+            except Exception as e:
+                print(f"[Bluetooth] Watchdog error: {e}")
+
+            self._watchdog_stop.wait(WATCHDOG_INTERVAL)
