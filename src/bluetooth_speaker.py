@@ -66,6 +66,12 @@ class BluetoothSpeaker:
     def start(self) -> None:
         """Initialize Bluetooth controller and attempt auto-connect."""
         self._started = True
+        # Unblock BT radio in case rfkill has it soft-blocked
+        try:
+            subprocess.run(["rfkill", "unblock", "bluetooth"],
+                           capture_output=True, timeout=5)
+        except Exception:
+            pass
         # Ensure the BT adapter is powered on
         _run_bluetoothctl("power", "on")
         self._load_config()
@@ -79,17 +85,38 @@ class BluetoothSpeaker:
     def scan(self, timeout=SCAN_TIMEOUT) -> list[dict]:
         """Scan for nearby Bluetooth devices.
 
+        Uses an interactive bluetoothctl process so the scan stays
+        active for the full timeout (non-interactive mode exits
+        immediately and discovers nothing).
+
         Returns a list of dicts: [{address, name, paired, connected}]
         """
         if not self._started:
             raise RuntimeError("BluetoothSpeaker not started. Call start() first.")
 
-        # Start scanning
-        _run_bluetoothctl("scan", "on")
-        time.sleep(timeout)
-        _run_bluetoothctl("scan", "off")
+        # Run scan in an interactive bluetoothctl session so discovery
+        # stays active for the full timeout period.
+        try:
+            proc = subprocess.Popen(
+                ["bluetoothctl"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            proc.stdin.write("scan on\n")
+            proc.stdin.flush()
+            time.sleep(timeout)
+            proc.stdin.write("scan off\n")
+            proc.stdin.flush()
+            time.sleep(1)
+            proc.stdin.write("quit\n")
+            proc.stdin.flush()
+            proc.wait(timeout=5)
+        except Exception as e:
+            print(f"[Bluetooth] Scan process error: {e}")
 
-        # Parse device list
+        # Parse device list (populated by BlueZ daemon during scan)
         success, output = _run_bluetoothctl("devices")
         if not success:
             return []
@@ -103,7 +130,6 @@ class BluetoothSpeaker:
                 if len(parts) >= 3:
                     address = parts[1]
                     name = parts[2]
-                    # Check paired/connected status via info
                     paired, connected = self._get_device_flags(address)
                     devices.append({
                         "address": address,
