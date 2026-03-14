@@ -18,7 +18,7 @@ Dependencies (system):
 
 Setup:
     1. Create a Spotify Developer App at https://developer.spotify.com/dashboard
-    2. Set redirect URI to http://room-guard.local:5000/api/spotify/callback
+    2. Set redirect URI to http://localhost:5000/api/spotify/callback
     3. Enter client_id and client_secret via the web dashboard or config file
 """
 
@@ -33,7 +33,7 @@ DEFAULT_CONFIG_PATH = os.path.join(
 )
 
 SCOPES = "user-library-read user-modify-playback-state user-read-playback-state user-read-currently-playing"
-DEFAULT_REDIRECT_URI = "http://room-guard.local:5000/api/spotify/callback"
+DEFAULT_REDIRECT_URI = "http://localhost:5000/api/spotify/callback"
 SPOTIFYD_DEVICE_NAME = "Room Guard"
 
 
@@ -130,6 +130,33 @@ class SpotifyPlayer:
         except Exception as e:
             print(f"[Spotify] Auth callback failed: {e}")
         return False
+
+    def handle_auth_url(self, url: str) -> bool:
+        """Extract the authorization code from a pasted callback URL.
+
+        For headless setups where the redirect goes to localhost on
+        the user's browser (not the Pi), the user can copy the full
+        URL from the address bar and paste it here.
+
+        Args:
+            url: The full callback URL, e.g.
+                 http://localhost:5000/api/spotify/callback?code=AQD...
+
+        Returns:
+            True if tokens were obtained successfully.
+        """
+        from urllib.parse import urlparse, parse_qs
+        try:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            code = params.get("code", [None])[0]
+            if not code:
+                print("[Spotify] No code found in pasted URL")
+                return False
+            return self.handle_auth_callback(code)
+        except Exception as e:
+            print(f"[Spotify] Failed to parse auth URL: {e}")
+            return False
 
     def get_liked_songs(self, limit=50, offset=0) -> list[dict]:
         """Fetch user's liked songs from Spotify.

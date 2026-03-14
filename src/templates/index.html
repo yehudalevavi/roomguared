@@ -272,11 +272,18 @@
     </button>
   </div>
 
-  <!-- Auth button (shown when configured but not authenticated) -->
+  <!-- Auth area (shown when configured but not authenticated) -->
   <div id="spotifyAuthArea" style="display:none;margin-top:8px;">
-    <button class="btn btn-green" onclick="connectSpotify()">
-      <span>🎧</span> <span data-i18n="spotify_connect">התחבר ל-Spotify</span>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px;" data-i18n="spotify_auth_hint">לחץ כדי לפתוח את דף ההרשאה של Spotify, אשר, ואז הדבק את הכתובת שאליה הועברת:</p>
+    <button class="btn btn-green" onclick="connectSpotify()" style="margin-bottom:8px;">
+      <span>🔗</span> <span data-i18n="spotify_open_auth">פתח דף הרשאה</span>
     </button>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="spotifyCallbackUrl" placeholder="http://localhost:5000/api/spotify/callback?code=..." style="flex:1;padding:10px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.85rem;" dir="ltr">
+      <button class="btn btn-blue" onclick="submitSpotifyCallback()">
+        <span>✓</span>
+      </button>
+    </div>
   </div>
 
   <!-- Now Playing (shown when authenticated) -->
@@ -391,6 +398,8 @@ const LANG = {
     spotify_setup_hint: 'הזן פרטי אפליקציית Spotify Developer:',
     spotify_save_creds: 'שמור',
     spotify_connect: 'התחבר ל-Spotify',
+    spotify_open_auth: 'פתח דף הרשאה',
+    spotify_auth_hint: 'לחץ כדי לפתוח את דף ההרשאה של Spotify, אשר, ואז הדבק את הכתובת שאליה הועברת:',
     spotify_connected: '● מחובר',
     spotify_not_connected: '○ לא מחובר',
     spotify_not_configured: 'לא מוגדר',
@@ -462,6 +471,8 @@ const LANG = {
     spotify_setup_hint: 'Enter your Spotify Developer App credentials:',
     spotify_save_creds: 'Save',
     spotify_connect: 'Connect Spotify',
+    spotify_open_auth: 'Open Auth Page',
+    spotify_auth_hint: 'Click to open Spotify authorization, approve, then paste the URL you were redirected to:',
     spotify_connected: '● Connected',
     spotify_not_connected: '○ Not Connected',
     spotify_not_configured: 'Not Configured',
@@ -937,6 +948,25 @@ async function connectSpotify() {
     const r = await fetch(API + '/api/spotify/auth');
     const d = await r.json();
     if (d.auth_url) window.open(d.auth_url, '_blank');
+  } catch(e) { console.error(e); }
+}
+
+async function submitSpotifyCallback() {
+  const url = document.getElementById('spotifyCallbackUrl').value.trim();
+  if (!url) return;
+  try {
+    const r = await fetch(API + '/api/spotify/auth-url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('spotifyCallbackUrl').value = '';
+      refreshSpotifyStatus();
+    } else {
+      alert(d.error || 'Auth failed');
+    }
   } catch(e) { console.error(e); }
 }
 

@@ -354,6 +354,22 @@ def api_spotify_callback():
     return "<h2>Spotify authorization failed</h2><p>Please try again.</p><p><a href='/'>Back to dashboard</a></p>", 500
 
 
+@app.route("/api/spotify/auth-url", methods=["POST"])
+def api_spotify_auth_url():
+    """Exchange a pasted callback URL for tokens (headless OAuth flow)."""
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "No URL provided"}), 400
+    try:
+        success = guard._spotify.handle_auth_url(url)
+        if success:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Could not extract auth code from URL"}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/spotify/play-random", methods=["POST"])
 def api_spotify_play_random():
     """Play a random song from liked songs."""
