@@ -1,3 +1,14 @@
 {
-  "cards": []
+  "cards": [
+    {
+      "uid": "0xA3BFE29A64",
+      "action": "toggle_arm",
+      "label": "Blue key"
+    },
+    {
+      "uid": "0x8804B8B286",
+      "action": "toggle_led",
+      "label": "Led card"
+    }
+  ]
 }
