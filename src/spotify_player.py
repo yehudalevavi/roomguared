@@ -440,12 +440,21 @@ class SpotifyPlayer:
         self._save_config()
 
 
-class _JsonCacheHandler:
+try:
+    from spotipy.cache_handler import CacheHandler as _BaseCacheHandler
+except ImportError:
+    _BaseCacheHandler = object
+
+
+class _JsonCacheHandler(_BaseCacheHandler):
     """Custom spotipy cache handler that stores tokens in our config JSON.
 
     Spotipy's SpotifyOAuth needs a CacheHandler to read/write tokens.
     This handler merges tokens into the existing config/spotify.json
     instead of creating a separate .cache file.
+
+    Inherits from spotipy's CacheHandler to satisfy the isinstance
+    check in SpotifyOAuth. Falls back to object if spotipy is not installed.
     """
 
     def __init__(self, config_path):
