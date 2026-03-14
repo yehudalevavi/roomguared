@@ -77,6 +77,52 @@ play -qn -t pulseaudio synth 0.3 pluck 659.3 : synth 0.4 pluck 880 gain -30
 | Trusting the device (for auto-reconnect) | BlueZ `trust` flag alone doesn't reliably auto-reconnect A2DP sinks |
 | Relying on `bluetoothctl info` `Connected: yes` | Does not guarantee A2DP audio is actually active |
 
+## Debugging While the Room Guard Service Is Running
+
+The `room_guard` systemd service includes a **BT reconnect watchdog** (in `bluetooth_speaker.py`) that polls `bluetoothctl info` every 15 seconds and calls `connect` if the device appears disconnected. During debugging, this watchdog can interfere with manual troubleshooting — it races with your commands, causes unexpected reconnect attempts, and was observed to **destabilize** an otherwise working connection.
+
+### How to Isolate the Watchdog
+
+If you suspect the watchdog is causing disconnections or interfering with your debug session:
+
+```bash
+# 1. Stop the room_guard service entirely
+sudo systemctl stop room_guard
+
+# 2. Now debug BT manually — no watchdog interference
+bluetoothctl info 50:1B:6A:FB:7A:85   # check state
+bluetoothctl connect 50:1B:6A:FB:7A:85 # manual connect
+pactl list sinks short                  # verify A2DP sink
+
+# 3. If BT is stable without the service but drops WITH it, the watchdog is the culprit
+```
+
+### How to Confirm the Watchdog Is the Problem
+
+1. **Stop the service** (`sudo systemctl stop room_guard`)
+2. **Manually connect** BT using the [Reliable Reconnect Sequence](#reliable-reconnect-sequence) above
+3. **Wait 5+ minutes** — if BT stays connected, the service/watchdog is likely causing the drops
+4. **Start the service** (`sudo systemctl start room_guard`) and observe — if BT drops within 1-2 minutes, the watchdog is confirmed as the cause
+
+During our debug session, BT was **stable without the service** and **dropped within minutes with the service running**. The watchdog's 15-second polling + reconnect loop was hammering BlueZ and destabilizing the A2DP transport.
+
+### Recommended Approach for Now
+
+Until the watchdog is fixed (see [Potential Fixes](#potential-fixes-to-investigate) below), the safest approach for debugging is:
+1. Stop the service
+2. Establish BT manually
+3. Start the service only after BT + Spotify are confirmed working
+4. If playback is needed urgently, use the Python API directly instead of the service:
+
+```bash
+cd ~/rpiProject && source .venv/bin/activate && python3 -c "
+import sys; sys.path.insert(0, 'src')
+from spotify_player import SpotifyPlayer
+sp = SpotifyPlayer(); sp.start()
+sp.play_random_liked_song()
+"
+```
+
 ## Pairing Notes (JBL Flip 7 Specific)
 
 ### Initial Pairing Procedure
