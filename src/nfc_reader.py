@@ -23,10 +23,103 @@ Setup:
 
 import json
 import os
+import sys
 import threading
 import time
 
 NFC_RST_PIN = 25  # GPIO 25 (Physical pin 22)
+
+# Board-pin → BCM-GPIO mapping for Raspberry Pi
+_BOARD_TO_BCM = {
+    3: 2, 5: 3, 7: 4, 8: 14, 10: 15, 11: 17, 12: 18,
+    13: 27, 15: 22, 16: 23, 18: 24, 19: 10, 21: 9,
+    22: 25, 23: 11, 24: 8, 26: 7, 29: 5, 31: 6, 32: 12,
+    33: 13, 35: 19, 36: 16, 37: 26, 38: 20, 40: 21,
+}
+
+
+def _install_gpio_shim():
+    """Replace RPi.GPIO with a gpiozero-backed shim.
+
+    The mfrc522 library uses RPi.GPIO to manage the RST pin.
+    RPi.GPIO accesses GPIO registers directly via /dev/gpiomem,
+    which corrupts the kernel's gpio-ir-recv driver on GPIO 18.
+
+    This shim implements the tiny RPi.GPIO subset that mfrc522
+    needs (setmode, setup, output, cleanup) using gpiozero, which
+    talks through the kernel-friendly lgpio/gpiochip interface.
+    """
+    if "RPi.GPIO" in sys.modules and not hasattr(
+        sys.modules["RPi.GPIO"], "_is_shim"
+    ):
+        # Real RPi.GPIO already loaded — too late to shim
+        return
+
+    from gpiozero import OutputDevice
+
+    class GPIOShim:
+        _is_shim = True
+
+        BOARD = 10
+        BCM = 11
+        OUT = 0
+        IN = 1
+        HIGH = 1
+        LOW = 0
+
+        _mode = None
+        _pins = {}
+
+        @staticmethod
+        def getmode():
+            return GPIOShim._mode
+
+        @staticmethod
+        def setmode(mode):
+            GPIOShim._mode = mode
+
+        @staticmethod
+        def setwarnings(flag):
+            pass
+
+        @staticmethod
+        def setup(pin, direction, **kwargs):
+            if direction != GPIOShim.OUT:
+                return
+            bcm = (
+                _BOARD_TO_BCM.get(pin, pin)
+                if GPIOShim._mode == GPIOShim.BOARD
+                else pin
+            )
+            if bcm not in GPIOShim._pins:
+                GPIOShim._pins[bcm] = OutputDevice(bcm, initial_value=False)
+
+        @staticmethod
+        def output(pin, value):
+            bcm = (
+                _BOARD_TO_BCM.get(pin, pin)
+                if GPIOShim._mode == GPIOShim.BOARD
+                else pin
+            )
+            dev = GPIOShim._pins.get(bcm)
+            if dev:
+                dev.on() if value else dev.off()
+
+        @staticmethod
+        def cleanup():
+            for dev in GPIOShim._pins.values():
+                try:
+                    dev.close()
+                except Exception:
+                    pass
+            GPIOShim._pins.clear()
+            GPIOShim._mode = None
+
+    # Inject into sys.modules so mfrc522 picks it up
+    rpi_module = type(sys)("RPi")
+    rpi_module.GPIO = GPIOShim
+    sys.modules["RPi"] = rpi_module
+    sys.modules["RPi.GPIO"] = GPIOShim
 DEBOUNCE_SECONDS = 2.0  # Ignore same card re-taps within this window
 POLL_INTERVAL = 0.3  # Seconds between card polls
 DEFAULT_CONFIG_PATH = os.path.join(
@@ -70,6 +163,7 @@ class NFCReader:
 
     def start(self) -> None:
         """Initialize the MFRC522 reader and start the polling thread."""
+        _install_gpio_shim()
         from mfrc522 import SimpleMFRC522
         self._reader = SimpleMFRC522()
         self._running = True
@@ -157,9 +251,6 @@ class NFCReader:
 
     def _poll_loop(self) -> None:
         """Background thread: poll for NFC cards and dispatch actions."""
-        from mfrc522 import SimpleMFRC522
-        import RPi.GPIO as GPIO
-
         while self._running:
             try:
                 reader = self._reader
