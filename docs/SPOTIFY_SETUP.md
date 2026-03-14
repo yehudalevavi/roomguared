@@ -159,3 +159,7 @@ pactl set-default-sink bluez_sink.XX_XX_XX_XX_XX_XX.a2dp_sink
 # Verify
 pactl info | grep "Default Sink"
 ```
+
+### Bluetooth connection drops after ~1-2 minutes
+
+This is a known issue with the JBL Flip 7 ↔ Pi 4 A2DP connection. The connection is stable while audio is streaming but drops during idle periods. See [`docs/BLUETOOTH_TROUBLESHOOTING.md`](BLUETOOTH_TROUBLESHOOTING.md) for full analysis, the reliable reconnect sequence, and potential fixes.

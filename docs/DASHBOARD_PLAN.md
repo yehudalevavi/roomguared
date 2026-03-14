@@ -594,7 +594,9 @@ spotipy>=2.23
 
 ## Phase 10: Spotify + Bluetooth Speaker Integration
 
-**Status: ✅ Complete**
+**Status: ⚠️ Functional — Bluetooth stability issue open**
+
+> **Known Issue:** The A2DP Bluetooth connection to the JBL Flip 7 drops after ~1-2 minutes of idle time. While connected, audio streaming works perfectly (both test tones and Spotify). Reconnecting requires a full BT+PulseAudio restart sequence — simple `bluetoothctl connect` fails with `br-connection-profile-unavailable`. The software watchdog reconnect loop (15s interval) was found to destabilize the connection further. See [`docs/BLUETOOTH_TROUBLESHOOTING.md`](BLUETOOTH_TROUBLESHOOTING.md) for full analysis, workarounds, and potential fixes to investigate.
 
 **Goal:** Stream Spotify music through a JBL Flip 7 Bluetooth speaker, controlled via IR remote, NFC card, or web dashboard.
 
