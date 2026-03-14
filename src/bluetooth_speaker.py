@@ -270,14 +270,32 @@ class BluetoothSpeaker:
             return False
 
     def get_status(self) -> dict:
-        """Return current Bluetooth connection status."""
+        """Return current Bluetooth connection status.
+
+        Queries bluetoothctl for live connection state rather than
+        relying on the cached flag, which can go stale when the
+        speaker powers off or goes out of range.
+        """
         with self._lock:
-            return {
-                "connected": self._connected,
-                "paired": self._paired,
-                "device_name": self._device_name,
-                "device_address": self._device_address,
-            }
+            address = self._device_address
+            name = self._device_name
+
+        # Live-check via bluetoothctl if we have a saved device
+        if address:
+            paired, connected = self._get_device_flags(address)
+            with self._lock:
+                self._connected = connected
+                self._paired = paired
+        else:
+            connected = False
+            paired = False
+
+        return {
+            "connected": connected,
+            "paired": paired,
+            "device_name": name,
+            "device_address": address,
+        }
 
     def auto_connect(self, retries=3, delay=5) -> bool:
         """Attempt to connect to the last known device from config.

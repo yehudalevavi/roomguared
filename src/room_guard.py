@@ -302,6 +302,13 @@ class RoomGuard:
                 status["playback"] = playback
             except Exception:
                 status["playback"] = None
+            # Include active device info
+            try:
+                devices = self._spotify.list_devices()
+                active = [d for d in devices if d.get("is_active")]
+                status["active_device"] = active[0]["name"] if active else None
+            except Exception:
+                status["active_device"] = None
         return status
 
     def play_random_song(self) -> dict | None:

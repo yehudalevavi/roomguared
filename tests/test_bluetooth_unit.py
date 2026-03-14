@@ -290,7 +290,8 @@ class TestBluetoothSpeakerStatus(unittest.TestCase):
         self.assertIsNone(status["device_name"])
         self.assertIsNone(status["device_address"])
 
-    def test_status_connected(self):
+    @patch("bluetooth_speaker._run_bluetoothctl", return_value=(True, "Paired: yes\nConnected: yes"))
+    def test_status_connected(self, mock_ctl):
         bt = BluetoothSpeaker(config_path="/nonexistent/path.json")
         bt._connected = True
         bt._paired = True

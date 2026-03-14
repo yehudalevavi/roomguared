@@ -292,6 +292,7 @@
       <div id="npAlbumArt" style="margin-bottom:8px;"></div>
       <div id="npTrackName" style="font-weight:700;font-size:1.1rem;">—</div>
       <div id="npArtist" style="color:var(--muted);font-size:0.9rem;">—</div>
+      <div id="npDevice" style="color:var(--muted);font-size:0.8rem;margin-top:4px;">🔊 —</div>
     </div>
 
     <!-- Transport controls -->
@@ -404,6 +405,7 @@ const LANG = {
     spotify_not_connected: '○ לא מחובר',
     spotify_not_configured: 'לא מוגדר',
     spotify_play_random: 'נגן שיר אקראי',
+    spotify_no_device: 'אין מכשיר פעיל',
     nfc_action_spotify_random: '🎧 נגן שיר אקראי (Spotify)',
     nfc_action_spotify_pause: '🎧 השהה/המשך (Spotify)',
     nfc_action_spotify_next: '🎧 שיר הבא (Spotify)',
@@ -477,6 +479,7 @@ const LANG = {
     spotify_not_connected: '○ Not Connected',
     spotify_not_configured: 'Not Configured',
     spotify_play_random: 'Play Random Song',
+    spotify_no_device: 'No active device',
     nfc_action_spotify_random: '🎧 Play random song (Spotify)',
     nfc_action_spotify_pause: '🎧 Pause/Resume (Spotify)',
     nfc_action_spotify_next: '🎧 Next track (Spotify)',
@@ -912,6 +915,15 @@ async function refreshSpotifyStatus() {
         document.getElementById('npArtist').textContent = '—';
         document.getElementById('npAlbumArt').innerHTML = '';
         _spotifyPlaying = false;
+      }
+      // Show active device
+      const devEl = document.getElementById('npDevice');
+      if (d.active_device) {
+        devEl.textContent = '🔊 ' + d.active_device;
+        devEl.style.color = d.active_device === 'Room Guard' ? 'var(--green)' : 'var(--muted)';
+      } else {
+        devEl.textContent = '🔇 ' + t('spotify_no_device');
+        devEl.style.color = 'var(--muted)';
       }
     } else if (d.configured) {
       badge.textContent = t('spotify_not_connected');
