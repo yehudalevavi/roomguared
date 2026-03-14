@@ -193,6 +193,31 @@
   </button>
 </div>
 
+<!-- NFC Cards -->
+<div class="card">
+  <div class="card-title"><span class="card-icon">💳</span> <span data-i18n="nfc_cards">כרטיסי NFC</span></div>
+  <div id="nfcStatus" style="font-size:0.85rem;color:var(--muted);margin-bottom:10px;" data-i18n="loading">טוען...</div>
+  <div id="nfcCardList" style="margin-bottom:10px;"></div>
+  <details style="margin-top:8px;">
+    <summary style="cursor:pointer;color:var(--purple);font-weight:700;font-size:0.95rem;" data-i18n="nfc_add_card">➕ הוסף כרטיס</summary>
+    <div style="margin-top:10px;">
+      <input type="text" id="nfcUid" placeholder="UID (למשל 0x1A2B3C4D)" data-i18n-placeholder="nfc_uid_ph" style="width:100%;padding:12px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.95rem;margin-bottom:6px;">
+      <input type="text" id="nfcLabel" placeholder="שם (למשל: מפתח של אבא)" data-i18n-placeholder="nfc_label_ph" style="width:100%;padding:12px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.95rem;margin-bottom:6px;">
+      <select id="nfcAction" style="width:100%;padding:12px;border-radius:12px;border:2px solid var(--card-border);background:rgba(255,255,255,0.06);color:var(--text);font-size:0.95rem;margin-bottom:8px;">
+        <option value="toggle_arm" data-i18n="nfc_action_arm">הפעל/השבת חיישן</option>
+        <option value="toggle_led" data-i18n="nfc_action_led">הדלק/כבה אור</option>
+        <option value="play_random" data-i18n="nfc_action_play">נגן מנגינה</option>
+        <option value="stop_melody" data-i18n="nfc_action_stop">עצור מנגינה</option>
+      </select>
+      <div id="nfcError" style="color:var(--red);font-size:0.85rem;margin-bottom:8px;display:none;"></div>
+      <button class="btn btn-blue" onclick="registerNfcCard()">
+        <span>💳</span> <span data-i18n="nfc_register">רשום כרטיס</span>
+      </button>
+    </div>
+  </details>
+  <div id="nfcLastScan" style="font-size:0.8rem;color:var(--muted);margin-top:10px;"></div>
+</div>
+
 <!-- Logs -->
 <div class="card">
   <div class="card-title"><span class="card-icon">📋</span> <span data-i18n="recent_activity">פעילות אחרונה</span></div>
@@ -242,6 +267,19 @@ const LANG = {
     lcd_line2_ph: 'שורה 2 (אופציונלי)',
     send_to_lcd: 'שלח למסך',
     lcd_error: 'תווים לא נתמכים — רק אותיות, מספרים וסימנים באנגלית',
+    nfc_cards: 'כרטיסי NFC',
+    nfc_add_card: '➕ הוסף כרטיס',
+    nfc_uid_ph: 'UID (למשל 0x1A2B3C4D)',
+    nfc_label_ph: 'שם (למשל: מפתח של אבא)',
+    nfc_action_arm: 'הפעל/השבת חיישן',
+    nfc_action_led: 'הדלק/כבה אור',
+    nfc_action_play: 'נגן מנגינה',
+    nfc_action_stop: 'עצור מנגינה',
+    nfc_register: 'רשום כרטיס',
+    nfc_no_reader: 'קורא NFC לא מחובר',
+    nfc_no_cards: 'אין כרטיסים רשומים',
+    nfc_last_scan: 'סריקה אחרונה',
+    nfc_remove_confirm: 'להסיר כרטיס זה?',
   },
   en: {
     title: 'Room Guard',
@@ -273,6 +311,19 @@ const LANG = {
     lcd_line2_ph: 'Line 2 (optional)',
     send_to_lcd: 'Send to LCD',
     lcd_error: 'Unsupported characters — use English letters, numbers & symbols only',
+    nfc_cards: 'NFC Cards',
+    nfc_add_card: '➕ Add Card',
+    nfc_uid_ph: 'UID (e.g. 0x1A2B3C4D)',
+    nfc_label_ph: 'Name (e.g. Dad\'s key fob)',
+    nfc_action_arm: 'Arm / Disarm sensor',
+    nfc_action_led: 'Toggle LED on/off',
+    nfc_action_play: 'Play melody',
+    nfc_action_stop: 'Stop melody',
+    nfc_register: 'Register Card',
+    nfc_no_reader: 'NFC reader not connected',
+    nfc_no_cards: 'No cards registered',
+    nfc_last_scan: 'Last scan',
+    nfc_remove_confirm: 'Remove this card?',
   }
 };
 
@@ -421,15 +472,104 @@ async function loadMelodies() {
   } catch(e) { console.error(e); }
 }
 
+// NFC card management
+const NFC_ACTION_LABELS = {
+  toggle_arm: () => t('nfc_action_arm'),
+  toggle_led: () => t('nfc_action_led'),
+  play_random: () => t('nfc_action_play'),
+  stop_melody: () => t('nfc_action_stop'),
+};
+
+function nfcActionLabel(action) {
+  if (NFC_ACTION_LABELS[action]) return NFC_ACTION_LABELS[action]();
+  if (action.startsWith('play_melody:')) return '🎶 ' + action.split(':')[1];
+  return action;
+}
+
+async function refreshNfcCards() {
+  try {
+    const r = await fetch(API + '/api/nfc/cards');
+    const d = await r.json();
+    const statusEl = document.getElementById('nfcStatus');
+    const listEl = document.getElementById('nfcCardList');
+
+    if (!d.available) {
+      statusEl.textContent = t('nfc_no_reader');
+      listEl.innerHTML = '';
+      return;
+    }
+
+    if (!d.cards.length) {
+      statusEl.textContent = t('nfc_no_cards');
+      listEl.innerHTML = '';
+      return;
+    }
+
+    statusEl.textContent = `${d.cards.length} 💳`;
+    listEl.innerHTML = d.cards.map(c => `
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.06);border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;">${c.label || c.uid}</div>
+          <div style="font-size:0.8rem;color:var(--muted);">${c.uid} → ${nfcActionLabel(c.action)}</div>
+        </div>
+        <button onclick="removeNfcCard('${c.uid}')" style="background:var(--red);color:#fff;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">✕</button>
+      </div>
+    `).join('');
+
+    // Last scan
+    const sr = await fetch(API + '/api/nfc/last-scan');
+    const sd = await sr.json();
+    const scanEl = document.getElementById('nfcLastScan');
+    if (sd.last_scan) {
+      scanEl.textContent = `${t('nfc_last_scan')}: ${sd.last_scan.uid} (${sd.last_scan.time.split(' ')[1]})`;
+    } else {
+      scanEl.textContent = '';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function registerNfcCard() {
+  const uid = document.getElementById('nfcUid').value.trim();
+  const label = document.getElementById('nfcLabel').value.trim();
+  const action = document.getElementById('nfcAction').value;
+  const errEl = document.getElementById('nfcError');
+
+  if (!uid) { errEl.textContent = 'UID required'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+
+  try {
+    const r = await fetch(API + '/api/nfc/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, action, label })
+    });
+    const d = await r.json();
+    if (!d.ok) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+    document.getElementById('nfcUid').value = '';
+    document.getElementById('nfcLabel').value = '';
+    refreshNfcCards();
+  } catch(e) { console.error(e); }
+}
+
+async function removeNfcCard(uid) {
+  if (!confirm(t('nfc_remove_confirm'))) return;
+  try {
+    await fetch(API + '/api/nfc/cards/' + encodeURIComponent(uid), { method: 'DELETE' });
+    refreshNfcCards();
+  } catch(e) { console.error(e); }
+}
+
 // Initial load
 applyLang();
 loadMelodies();
 refreshStatus();
 refreshLogs();
+refreshNfcCards();
 
 // Auto-refresh
 setInterval(refreshStatus, 3000);
 setInterval(refreshLogs, 5000);
+setInterval(refreshNfcCards, 10000);
 </script>
 </body>
 </html>

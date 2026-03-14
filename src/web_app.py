@@ -23,6 +23,7 @@ from buzzer import MELODY_STARTUP
 app = Flask(__name__)
 guard = RoomGuard()
 ir_remote = None
+nfc_reader = None
 
 
 # --- HTML Dashboard ---
@@ -142,11 +143,60 @@ def api_toggle_arm():
     return jsonify({"ok": True, "armed": armed})
 
 
+# --- NFC API ---
+
+@app.route("/api/nfc/cards")
+def api_nfc_cards():
+    """List all registered NFC cards."""
+    if nfc_reader is None:
+        return jsonify({"ok": True, "cards": [], "available": False})
+    cards = nfc_reader.get_registered_cards()
+    return jsonify({"ok": True, "cards": cards, "available": True})
+
+
+@app.route("/api/nfc/register", methods=["POST"])
+def api_nfc_register():
+    """Register a new NFC card mapping."""
+    if nfc_reader is None:
+        return jsonify({"ok": False, "error": "NFC reader not available"}), 503
+    data = request.get_json(silent=True) or {}
+    uid = data.get("uid", "").strip()
+    action = data.get("action", "").strip()
+    label = data.get("label", "").strip()
+    if not uid or not action:
+        return jsonify({"ok": False, "error": "uid and action are required"}), 400
+    valid_actions = ["toggle_arm", "toggle_led", "play_random", "stop_melody"]
+    if action not in valid_actions and not action.startswith("play_melody:"):
+        return jsonify({"ok": False, "error": f"Invalid action. Valid: {valid_actions} or play_melody:<name>"}), 400
+    nfc_reader.register_card(uid, action, label)
+    return jsonify({"ok": True, "uid": uid, "action": action, "label": label})
+
+
+@app.route("/api/nfc/cards/<path:uid>", methods=["DELETE"])
+def api_nfc_remove(uid):
+    """Remove a registered NFC card."""
+    if nfc_reader is None:
+        return jsonify({"ok": False, "error": "NFC reader not available"}), 503
+    removed = nfc_reader.remove_card(uid)
+    if not removed:
+        return jsonify({"ok": False, "error": "Card not found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/nfc/last-scan")
+def api_nfc_last_scan():
+    """Return the last scanned NFC card UID and timestamp."""
+    if nfc_reader is None:
+        return jsonify({"ok": True, "last_scan": None, "available": False})
+    scan = nfc_reader.get_last_scan()
+    return jsonify({"ok": True, "last_scan": scan, "available": True})
+
+
 # --- Startup ---
 
 def start_guard():
     """Initialize hardware and auto-arm after calibration."""
-    global ir_remote
+    global ir_remote, nfc_reader
     try:
         guard.start()
     except Exception as e:
@@ -163,6 +213,15 @@ def start_guard():
     except Exception as e:
         print(f"[Web App] IR remote not available: {e}")
 
+    # Start NFC reader (non-fatal if unavailable)
+    try:
+        from nfc_reader import NFCReader
+        nfc_reader = NFCReader(guard)
+        nfc_reader.start()
+        guard._log_message("NFC card reader active")
+    except Exception as e:
+        print(f"[Web App] NFC reader not available: {e}")
+
     guard._buzzer.play_melody(MELODY_STARTUP)
     guard._log_message("PIR sensor calibrating (40s)...")
     time.sleep(40)
@@ -173,6 +232,8 @@ def start_guard():
 def shutdown_handler(signum=None, frame=None):
     """Clean shutdown on SIGINT/SIGTERM."""
     print()
+    if nfc_reader:
+        nfc_reader.stop()
     if ir_remote:
         ir_remote.stop()
     guard.stop()

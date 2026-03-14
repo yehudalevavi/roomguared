@@ -1,6 +1,6 @@
 # 🌡️ Smart Room Dashboard — Implementation Plan
 
-> Evolving the Room Guard into a room monitoring station with temperature, humidity, LCD display, IR remote control, and data logging.
+> Evolving the Room Guard into a room monitoring station with temperature, humidity, LCD display, IR remote control, NFC card reader, and data logging.
 
 ## Approach
 
@@ -182,9 +182,7 @@ Browser (phone/laptop)          Raspberry Pi
 
 ## Phase 4: LCD1602 Display (4-bit parallel mode)
 
-**Status: ⏸️ Code-complete — waiting for hardware**
-
-> The display module and unit tests are implemented and committed. When you have the physical LCD1602, potentiometer, and jumper wires, complete the remaining steps below.
+**Status: ✅ Complete**
 
 **Goal:** Display text on the LCD screen.
 
@@ -207,7 +205,7 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | 11 | D4 | RPi Pin 33 (GPIO 13) | Data bit 4 |
 | 12 | D5 | RPi Pin 31 (GPIO 6) | Data bit 5 |
 | 13 | D6 | RPi Pin 29 (GPIO 5) | Data bit 6 |
-| 14 | D7 | RPi Pin 23 (GPIO 11) | Data bit 7 |
+| 14 | D7 | RPi Pin 32 (GPIO 12) | Data bit 7 *(reassigned from GPIO 11 — see Phase 9)* |
 | 15 | A | Breadboard + rail via 220Ω | Backlight + |
 | 16 | K | Breadboard − rail | Backlight − |
 
@@ -231,13 +229,6 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
   - `line1`/`line2` read-only properties for current display content
 - `src/test_lcd.py` — hardware test that displays "Hello Room Guard!" and cycles through text patterns
 - `tests/test_lcd_unit.py` — 27 unit tests (pass without hardware)
-
-**When the LCD arrives — remaining steps:**
-1. **Wire** the LCD1602 to the breadboard using the table above (power off the Pi first!)
-2. **Wire** the potentiometer for contrast adjustment
-3. **Test** hardware: `source .venv/bin/activate && python3 src/test_lcd.py`
-4. Adjust the **potentiometer** until text is clearly visible
-5. **Integrate** the LCD into `room_guard.py` (Phase 7)
 
 **Validation:**
 - ✅ LCD backlight turns on when powered
@@ -413,6 +404,119 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 
 ---
 
+## Phase 9: NFC Card Reader (MFRC522)
+
+**Status: ✅ Complete**
+
+**Goal:** Use the MFRC522 RFID/NFC reader to let household members tap NFC cards or key fobs to control the Room Guard — arm/disarm, toggle the LED, play melodies, and more.
+
+**Why:** The IR remote is great for nearby control, and the web dashboard works from any device — but NFC adds a different interaction model. Each family member gets their own card with a personalized action. Tap to arm when leaving, tap to disarm when arriving — no phone needed, no buttons to find in the dark.
+
+**New wiring (7 wires — all direct to RPi, no breadboard):**
+
+The MFRC522 module uses SPI (Serial Peripheral Interface). It connects directly to the RPi's dedicated SPI0 pins and power — no breadboard needed.
+
+| Wire | From | To | Notes |
+|------|------|----|-------|
+| SDA | MFRC522 SDA | RPi Pin 24 (GPIO 8) | SPI chip select (CE0) |
+| SCK | MFRC522 SCK | RPi Pin 23 (GPIO 11) | SPI clock |
+| MOSI | MFRC522 MOSI | RPi Pin 19 (GPIO 10) | SPI data out |
+| MISO | MFRC522 MISO | RPi Pin 21 (GPIO 9) | SPI data in |
+| RST | MFRC522 RST | RPi Pin 22 (GPIO 25) | Reset |
+| 3.3V | MFRC522 VCC | RPi Pin 17 (3.3V) | ⚠️ Must use 3.3V, not 5V |
+| GND | MFRC522 GND | RPi Pin 20 (GND) | Ground |
+| IRQ | MFRC522 IRQ | — | Not connected (not needed) |
+
+> ⚠️ **Power the MFRC522 from 3.3V, not 5V.** The module operates at 3.3V logic. The SPI pins connect directly to RPi GPIOs which are 3.3V-only — using 5V risks damaging the Pi.
+>
+> ⚠️ **GPIO 11 conflict resolved:** GPIO 11 (Pin 23) was previously assigned to LCD D7 in Phase 4. Since the LCD hasn't been wired yet, LCD D7 has been **reassigned to GPIO 12 (Pin 32)**. The Phase 4 wiring table has been updated. During implementation, `lcd_display.py` will also be updated (`LCD_D7 = 12`).
+
+**System setup:**
+- Enable SPI interface on the Pi:
+  ```bash
+  sudo raspi-config nonint do_spi 0
+  ```
+  Or via `raspi-config` → Interface Options → SPI → Enable
+- Reboot for the change to take effect
+- Verify SPI is enabled:
+  ```bash
+  ls /dev/spidev*
+  ```
+  Should show `/dev/spidev0.0` and `/dev/spidev0.1`
+
+**Software (done ✅):**
+- Install `mfrc522` and `spidev` libraries (add to `requirements.txt`)
+- Update `src/lcd_display.py` — change `LCD_D7` from GPIO 11 to GPIO 12
+- Create `src/nfc_reader.py` — NFC reader module:
+  - `NFCReader` class that polls for cards in a background daemon thread
+  - Configurable UID-to-action mapping (loaded from `config/nfc_cards.json`)
+  - Card tap detection with ~2 second debounce to prevent repeat triggers
+  - Confirmation beep on successful card read (short high tone)
+  - Error beep for unregistered cards (short low tone)
+  - `register_card(uid, action, label)` — add a new card mapping
+  - `remove_card(uid)` — remove a card mapping
+  - `get_registered_cards()` — list all registered cards
+- Create `config/nfc_cards.json` — card UID → action mapping:
+  ```json
+  {
+    "cards": [
+      {
+        "uid": "0x1A2B3C4D",
+        "action": "toggle_arm",
+        "label": "Dad's key fob"
+      },
+      {
+        "uid": "0x5E6F7A8B",
+        "action": "toggle_led",
+        "label": "White card"
+      }
+    ]
+  }
+  ```
+- Create `src/test_nfc.py` — hardware test:
+  - Scans for cards and prints UIDs (useful for registering new cards)
+  - Tests read reliability (10 consecutive reads)
+- Create `tests/test_nfc_unit.py` — unit tests (pass without hardware):
+  - Config loading/saving
+  - UID-to-action dispatch
+  - Debounce logic
+  - Registration/removal
+- Add web API endpoints:
+  - `GET /api/nfc/cards` — list registered cards and their actions
+  - `POST /api/nfc/register` — enter scan mode, tap card to register with an action
+  - `DELETE /api/nfc/cards/<uid>` — remove a card mapping
+  - `GET /api/nfc/last-scan` — last scanned card UID and timestamp
+- Add NFC card management section to the web dashboard UI
+
+**Supported actions (mapped per card):**
+
+| Action | Description | Sound Cue |
+|--------|-------------|-----------|
+| `toggle_arm` | Arm if disarmed, disarm if armed | `MELODY_ARM` / `MELODY_DISARM` jingle |
+| `toggle_led` | Toggle LED on/off | Short confirmation beep |
+| `play_melody:<name>` | Play a specific melody by name | The melody itself |
+| `play_random` | Play a random melody from the library | The melody itself |
+| `stop_melody` | Stop any currently playing melody | Short low beep |
+
+> New actions can be added easily — the mapping is just a string dispatched to existing `RoomGuard` methods.
+
+**Integration with Room Guard:**
+- `RoomGuard` reuses existing methods: `toggle_arm()`, `set_led()`, `play_melody_by_name()`, `stop_melody()` — same ones used by IR remote and web dashboard
+- NFC reader auto-starts alongside the web app and IR remote
+- Card tap events are logged (timestamp, UID, label, action triggered)
+- LCD shows card label briefly when tapped (e.g., `"Dad's fob"` / `"Armed!"`)
+
+**Validation:**
+- ✅ `test_nfc.py` detects and prints card UIDs when tapped on the reader
+- ✅ Registered card triggers the correct action with confirmation beep
+- ✅ Unregistered card plays error beep, does not trigger any action
+- ✅ Debounce prevents rapid re-triggers when card is held near reader
+- ✅ Web dashboard shows registered cards and allows management
+- ✅ NFC works simultaneously with IR remote and web dashboard (no conflicts)
+- ✅ Unit tests pass without hardware
+
+---
+
 ## GPIO Pin Map (Final)
 
 | Component | GPIO (BCM) | Physical Pin | Direction |
@@ -429,9 +533,14 @@ The LCD1602 has 16 pins along the top. Wire them as follows:
 | LCD D4 | GPIO 13 | Pin 33 | OUTPUT |
 | LCD D5 | GPIO 6 | Pin 31 | OUTPUT |
 | LCD D6 | GPIO 5 | Pin 29 | OUTPUT |
-| LCD D7 | GPIO 11 | Pin 23 | OUTPUT |
+| LCD D7 | GPIO 12 | Pin 32 | OUTPUT |
+| NFC SDA (CE0) | GPIO 8 | Pin 24 | SPI |
+| NFC SCK | GPIO 11 | Pin 23 | SPI |
+| NFC MOSI | GPIO 10 | Pin 19 | SPI |
+| NFC MISO | GPIO 9 | Pin 21 | SPI |
+| NFC RST | GPIO 25 | Pin 22 | OUTPUT |
 
-> All component VCC/GND pins connect to the breadboard power rails, not directly to RPi pins.
+> All component VCC/GND pins connect to the breadboard power rails, not directly to RPi pins — **except** the MFRC522 NFC reader, which connects directly to RPi Pin 17 (3.3V) and Pin 20 (GND).
 
 ## Auto-Update on Service Start
 
@@ -476,4 +585,6 @@ gpiozero>=2.0
 adafruit-circuitpython-dht
 RPLCD
 evdev
+mfrc522
+spidev
 ```

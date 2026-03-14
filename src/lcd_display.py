@@ -12,7 +12,7 @@ Wiring (see DESIGN.md for full details):
     D4  → RPi Pin 33 (GPIO 13)
     D5  → RPi Pin 31 (GPIO 6)
     D6  → RPi Pin 29 (GPIO 5)
-    D7  → RPi Pin 23 (GPIO 11)
+    D7  → RPi Pin 32 (GPIO 12)
     VSS → GND rail, VDD → 5V rail, RW → GND rail
     V0  → Potentiometer wiper (contrast)
     A   → 5V rail via 220Ω, K → GND rail (backlight)
@@ -24,7 +24,7 @@ LCD_E = 19    # Enable — Pin 35
 LCD_D4 = 13   # Data bit 4 — Pin 33
 LCD_D5 = 6    # Data bit 5 — Pin 31
 LCD_D6 = 5    # Data bit 6 — Pin 29
-LCD_D7 = 11   # Data bit 7 — Pin 23
+LCD_D7 = 12   # Data bit 7 — Pin 32 (reassigned from GPIO 11 for NFC SPI)
 
 LCD_COLS = 16  # characters per line
 LCD_ROWS = 2   # number of lines

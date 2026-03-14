@@ -440,8 +440,20 @@ def main() -> None:
     except Exception as e:
         print(f"[Room Guard] IR remote not available: {e}")
 
+    # Start NFC reader (non-fatal if unavailable)
+    nfc = None
+    try:
+        from nfc_reader import NFCReader
+        nfc = NFCReader(guard)
+        nfc.start()
+        print("[Room Guard] NFC card reader active")
+    except Exception as e:
+        print(f"[Room Guard] NFC reader not available: {e}")
+
     def shutdown(signum=None, frame=None):
         print()
+        if nfc:
+            nfc.stop()
         if ir:
             ir.stop()
         guard.stop()

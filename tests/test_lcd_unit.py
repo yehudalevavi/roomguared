@@ -37,7 +37,7 @@ class TestLCDDisplayInit(unittest.TestCase):
         lcd = LCDDisplay()
         self.assertEqual(lcd.rs, 26)
         self.assertEqual(lcd.e, 19)
-        self.assertEqual(lcd.data_pins, [13, 6, 5, 11])
+        self.assertEqual(lcd.data_pins, [13, 6, 5, 12])
 
     def test_custom_pins(self):
         lcd = LCDDisplay(rs=1, e=2, d4=3, d5=4, d6=5, d7=6)
@@ -77,7 +77,7 @@ class TestLCDDisplayLifecycle(unittest.TestCase):
         self.assertEqual(call_kwargs["rows"], 2)
         self.assertEqual(call_kwargs["pin_rs"], 26)
         self.assertEqual(call_kwargs["pin_e"], 19)
-        self.assertEqual(call_kwargs["pins_data"], [13, 6, 5, 11])
+        self.assertEqual(call_kwargs["pins_data"], [13, 6, 5, 12])
         self.assertTrue(call_kwargs["compat_mode"])
 
     def test_start_clears_display(self):

@@ -47,6 +47,8 @@ After a cooldown period (default: 5 seconds), both turn off and the system is re
 | 11 | Jumper wires (Male-to-Female) | ~20 | ~$2  | For connecting RPi GPIO to breadboard  |
 | 12 | IR receiver (VS1838B)  | 1   | ~$1         | 3-pin: Signal, VCC, GND (from Elegoo kit) |
 | 13 | IR remote control      | 1   | —           | NEC protocol remote (from Elegoo kit or any NEC remote) |
+| 14 | MFRC522 NFC/RFID reader | 1  | ~$2         | SPI interface, 3.3V — **do not power from 5V** |
+| 15 | NFC cards / key fobs   | 1+  | ~$1         | 13.56 MHz MIFARE tags (included with MFRC522 kits) |
 
 ---
 
@@ -164,9 +166,14 @@ All components then tap power and ground from these rails. This keeps wiring cle
 | LCD D4           | GPIO 13   | Pin 33      | OUTPUT    |
 | LCD D5           | GPIO 6    | Pin 31      | OUTPUT    |
 | LCD D6           | GPIO 5    | Pin 29      | OUTPUT    |
-| LCD D7           | GPIO 11   | Pin 23      | OUTPUT    |
+| LCD D7           | GPIO 12   | Pin 32      | OUTPUT     |
+| NFC SDA (CE0)    | GPIO 8    | Pin 24      | SPI        |
+| NFC SCK          | GPIO 11   | Pin 23      | SPI        |
+| NFC MOSI         | GPIO 10   | Pin 19      | SPI        |
+| NFC MISO         | GPIO 9    | Pin 21      | SPI        |
+| NFC RST          | GPIO 25   | Pin 22      | OUTPUT     |
 
-> All component VCC pins connect to the breadboard **+ rail**, and all GND pins to the **− rail**.
+> All component VCC pins connect to the breadboard **+ rail**, and all GND pins to the **− rail** — **except** the MFRC522 NFC reader, which connects directly to RPi Pin 17 (3.3V) and Pin 20 (GND).
 
 ### Wiring Diagram
 
@@ -187,17 +194,24 @@ All components then tap power and ground from these rails. This keeps wiring cle
   GPIO27 (13)(14) GND
          ┌──────────────────────────────── Buzzer (+)
   GPIO22 (15)(16) GPIO23
+         ┌──────────────────────────────── NFC 3.3V (direct to module — NOT 5V!)
     3V3  (17)(18) GPIO24
+         ┌──────────────────────────────── NFC MOSI
   GPIO10 (19)(20) GND
+                  └─────────────────────── NFC GND (direct to module)
+         ┌──────────────────────────────── NFC MISO
    GPIO9 (21)(22) GPIO25
-         ┌──────────────────────────────── LCD D7
+                  └─────────────────────── NFC RST
+         ┌──────────────────────────────── NFC SCK (SPI clock)
   GPIO11 (23)(24) GPIO8
+                  └─────────────────────── NFC SDA (SPI CE0)
     GND  (25)(26) GPIO7
    GPIO0 (27)(28) GPIO1
          ┌──────────────────────────────── LCD D6
    GPIO5 (29)(30) GND
          ┌──────────────────────────────── LCD D5
    GPIO6 (31)(32) GPIO12
+                  └─────────────────────── LCD D7 (moved from Pin 23 for NFC)
          ┌──────────────────────────────── LCD D4
   GPIO13 (33)(34) GND
          ┌──────────────────────────────── LCD Enable (E)
@@ -301,7 +315,7 @@ The LCD1602 has **16 pins** along the top edge. We use 4-bit mode so only 6 GPIO
 | 11 | D4 | RPi Pin 33 (GPIO 13) | Data bit 4 |
 | 12 | D5 | RPi Pin 31 (GPIO 6) | Data bit 5 |
 | 13 | D6 | RPi Pin 29 (GPIO 5) | Data bit 6 |
-| 14 | D7 | RPi Pin 23 (GPIO 11) | Data bit 7 |
+| 14 | D7 | RPi Pin 32 (GPIO 12) | Data bit 7 *(reassigned from GPIO 11 for NFC SPI)* |
 | 15 | A | Breadboard + rail via 220Ω resistor | Backlight anode (+) |
 | 16 | K | Breadboard − rail | Backlight cathode (−) |
 
@@ -329,7 +343,7 @@ The LCD1602 has **16 pins** along the top edge. We use 4-bit mode so only 6 GPIO
 9. Wire LCD **pin 11 (D4)** to RPi **Pin 33 (GPIO 13)**.
 10. Wire LCD **pin 12 (D5)** to RPi **Pin 31 (GPIO 6)**.
 11. Wire LCD **pin 13 (D6)** to RPi **Pin 29 (GPIO 5)**.
-12. Wire LCD **pin 14 (D7)** to RPi **Pin 23 (GPIO 11)**.
+12. Wire LCD **pin 14 (D7)** to RPi **Pin 32 (GPIO 12)**.
 13. Wire a **220Ω resistor** from the breadboard **+ rail** to LCD **pin 15 (A)** (backlight power).
 14. Wire LCD **pin 16 (K)** to the breadboard **− rail**.
 
@@ -356,6 +370,60 @@ python3 src/test_dht11.py
 ```
 
 You should see 10 readings with temperature (°C) and humidity (%). At least 8/10 should succeed. If not, check the [Troubleshooting](#troubleshooting) section.
+
+#### MFRC522 NFC/RFID Reader (SPI)
+
+The MFRC522 module uses SPI (Serial Peripheral Interface) to communicate with the Pi. It connects to the Pi's dedicated SPI0 pins.
+
+> ⚠️ **Before wiring:** SPI must be enabled on the Pi. Run `sudo raspi-config nonint do_spi 0` and reboot.
+
+> ⚠️ **Power from 3.3V, not 5V!** The MFRC522 operates at 3.3V logic. Its SPI pins connect directly to RPi GPIOs which are 3.3V-only — powering from 5V risks damaging the Pi.
+
+> ⚠️ **GPIO 11 conflict:** GPIO 11 (Pin 23) was previously used for LCD D7. It has been reassigned to the NFC SPI clock (SCK). LCD D7 has been moved to GPIO 12 (Pin 32). If your LCD is already wired, **move the D7 wire from Pin 23 to Pin 32** before adding the NFC reader.
+
+**MFRC522 pin connections:**
+
+| MFRC522 Pin | Connect To | Notes |
+|-------------|-----------|-------|
+| SDA | RPi Pin 24 (GPIO 8) | SPI chip select (CE0) |
+| SCK | RPi Pin 23 (GPIO 11) | SPI clock |
+| MOSI | RPi Pin 19 (GPIO 10) | SPI data out (Pi → reader) |
+| MISO | RPi Pin 21 (GPIO 9) | SPI data in (reader → Pi) |
+| RST | RPi Pin 22 (GPIO 25) | Reset |
+| 3.3V | RPi Pin 17 (3.3V) | ⚠️ Must use 3.3V, not 5V |
+| GND | RPi Pin 20 (GND) | Ground (direct to Pi) |
+| IRQ | — | Not connected (not needed) |
+
+**Step-by-step:**
+
+1. If LCD D7 is currently wired to Pin 23 (GPIO 11), **move it to Pin 32 (GPIO 12)**.
+2. Wire MFRC522 **SDA** to RPi **Pin 24 (GPIO 8)**.
+3. Wire MFRC522 **SCK** to RPi **Pin 23 (GPIO 11)**.
+4. Wire MFRC522 **MOSI** to RPi **Pin 19 (GPIO 10)**.
+5. Wire MFRC522 **MISO** to RPi **Pin 21 (GPIO 9)**.
+6. Wire MFRC522 **RST** to RPi **Pin 22 (GPIO 25)**.
+7. Wire MFRC522 **3.3V** to RPi **Pin 17 (3.3V)** — **not** the 5V breadboard rail.
+8. Wire MFRC522 **GND** to RPi **Pin 20 (GND)**.
+9. Leave MFRC522 **IRQ** not connected.
+
+##### Testing the NFC Reader
+
+First, verify SPI is enabled:
+
+```bash
+ls /dev/spidev*
+```
+
+Should show `/dev/spidev0.0` and `/dev/spidev0.1`. If not, enable SPI and reboot (see above).
+
+Then run the hardware test:
+
+```bash
+source .venv/bin/activate
+python3 src/test_nfc.py
+```
+
+Hold an NFC card or key fob near the reader. You should see the card's UID printed. Press Ctrl+C to stop. Use the printed UIDs to register cards via the web dashboard (💳 NFC Cards section).
 
 ### PIR Sensor Adjustment
 
@@ -518,9 +586,12 @@ IR Remote Control               │    ├── PIR sensor (GPIO 17)      │
 │  🎮 Remote   │───────────────►│    ├── Buzzer (GPIO 22)          │
 │   (NEC)      │   GPIO 18     │    ├── IR receiver (GPIO 18)     │
 └──────────────┘                │    ├── LCD 16×2 (GPIO 26,19,     │
-                                │    │   13,6,5,11)                 │
-                                │    └── Melody library (20 tunes) │
-                                └──────────────────────────────────┘
+                                │    │   13,6,5,12)                 │
+NFC Cards / Key Fobs            │    ├── NFC reader MFRC522 (SPI0: │
+┌──────────────┐     13.56 MHz  │    │   GPIO 8,11,10,9,25)        │
+│  💳 Card     │───────────────►│    └── Melody library (20 tunes) │
+│  (MIFARE)    │   MFRC522     │                                   │
+└──────────────┘                └──────────────────────────────────┘
 ```
 
 ### Components
@@ -531,6 +602,7 @@ IR Remote Control               │    ├── PIR sensor (GPIO 17)      │
 - **`src/buzzer.py`** — PWM buzzer driver with a full chromatic scale (C4–C6). Provides system melodies (startup, arm, disarm, sensor error) and the `Buzzer` class for playing tones and melodies.
 - **`src/melody_library.py`** — Library of 20 famous public-domain melodies. `get_random_melody()` returns a random melody for motion alerts.
 - **`src/ir_remote.py`** — IR remote control handler using Linux `gpio-ir-recv` overlay and `evdev`. Listens for NEC remote keypresses in a background thread and dispatches actions (prev/play-pause/next melody, arm/disarm) to the `RoomGuard` instance. Button mapping is configurable.
+- **`src/nfc_reader.py`** — NFC/RFID card reader using the MFRC522 module via SPI. Polls for cards in a background thread, dispatches configurable actions (arm/disarm, LED toggle, play melody, etc.) to the `RoomGuard` instance. Card-to-action mappings stored in `config/nfc_cards.json`. 2-second debounce prevents repeat triggers.
 - **`src/templates/index.html`** — Single-page responsive dashboard. Dark theme, mobile-friendly, no CDN dependencies (works offline on local network). Auto-refreshes status (3s) and logs (5s) via `fetch` API.
 
 ### Web Dashboard

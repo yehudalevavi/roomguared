@@ -11,7 +11,7 @@ Wiring (see DESIGN.md for full details):
     D4  → RPi Pin 33 (GPIO 13)
     D5  → RPi Pin 31 (GPIO 6)
     D6  → RPi Pin 29 (GPIO 5)
-    D7  → RPi Pin 23 (GPIO 11)
+    D7  → RPi Pin 32 (GPIO 12)
     VSS → GND, VDD → 5V, RW → GND
     V0  → Potentiometer wiper (contrast)
     A   → 5V via 220 ohm, K → GND (backlight)
