@@ -77,15 +77,9 @@ class NFCReader:
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the polling thread and clean up GPIO."""
+        """Stop the polling thread."""
         self._running = False
-        if self._reader is not None:
-            try:
-                import RPi.GPIO as GPIO
-                GPIO.cleanup()
-            except Exception:
-                pass
-            self._reader = None
+        self._reader = None
 
     def get_registered_cards(self) -> list[dict]:
         """Return a copy of all registered cards."""
