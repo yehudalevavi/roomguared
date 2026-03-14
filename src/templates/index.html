@@ -248,6 +248,9 @@
     <button class="btn btn-red" id="btDisconnectBtn" onclick="btDisconnect()" style="display:none;">
       <span>🔌</span> <span data-i18n="bt_disconnect">נתק</span>
     </button>
+    <button class="btn" id="btTestSoundBtn" onclick="btTestSound()" style="display:none;">
+      <span>🔔</span> <span data-i18n="bt_test_sound">בדיקת צליל</span>
+    </button>
   </div>
 </div>
 
@@ -379,6 +382,7 @@ const LANG = {
     bt_connection: 'חיבור',
     bt_scan: 'סרוק מכשירים',
     bt_disconnect: 'נתק',
+    bt_test_sound: 'בדיקת צליל',
     bt_scanning: 'סורק...',
     bt_connected: '● מחובר',
     bt_disconnected: '○ מנותק',
@@ -449,6 +453,7 @@ const LANG = {
     bt_connection: 'Connection',
     bt_scan: 'Scan Devices',
     bt_disconnect: 'Disconnect',
+    bt_test_sound: 'Test Sound',
     bt_scanning: 'Scanning...',
     bt_connected: '● Connected',
     bt_disconnected: '○ Disconnected',
@@ -783,17 +788,20 @@ async function refreshBtStatus() {
     const badge = document.getElementById('btBadge');
     const nameEl = document.getElementById('btDeviceName');
     const disconnBtn = document.getElementById('btDisconnectBtn');
+    const testSndBtn = document.getElementById('btTestSoundBtn');
 
     if (d.connected) {
       badge.textContent = t('bt_connected');
       badge.className = 'badge badge-green';
       nameEl.textContent = d.device_name || d.device_address || '';
       disconnBtn.style.display = '';
+      testSndBtn.style.display = '';
     } else {
       badge.textContent = t('bt_disconnected');
       badge.className = 'badge badge-muted';
       nameEl.textContent = d.device_name ? (d.device_name + ' (disconnected)') : '';
       disconnBtn.style.display = 'none';
+      testSndBtn.style.display = 'none';
     }
   } catch(e) { console.error(e); }
 }
@@ -846,6 +854,14 @@ async function btDisconnect() {
   try {
     await fetch(API + '/api/bluetooth/disconnect', { method: 'POST' });
     refreshBtStatus();
+  } catch(e) { console.error(e); }
+}
+
+async function btTestSound() {
+  try {
+    const r = await fetch(API + '/api/bluetooth/test-sound', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) alert(d.error || 'Test sound failed');
   } catch(e) { console.error(e); }
 }
 

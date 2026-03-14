@@ -295,6 +295,18 @@ def api_bt_remove(address):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/bluetooth/test-sound", methods=["POST"])
+def api_bt_test_sound():
+    """Play a short test chime through the connected speaker."""
+    try:
+        success = guard._bt_speaker.test_sound()
+        if not success:
+            return jsonify({"ok": False, "error": "No speaker connected"}), 400
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 # --- Spotify API ---
 
 @app.route("/api/spotify/status")

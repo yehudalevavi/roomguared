@@ -225,6 +225,49 @@ class BluetoothSpeaker:
         print(f"[Bluetooth] Removed {address}")
         return success
 
+    def test_sound(self) -> bool:
+        """Play a short test chime through the connected speaker.
+
+        Generates a 0.3s 880Hz sine wave (A5 note) followed by a
+        0.3s 1320Hz sine wave (E6) using paplay + sox.  Falls back
+        to speaker-test if sox is unavailable.
+        """
+        if not self._started:
+            raise RuntimeError("BluetoothSpeaker not started. Call start() first.")
+
+        with self._lock:
+            if not self._connected:
+                return False
+
+        # Try sox (generates a pleasant two-tone gling)
+        try:
+            subprocess.run(
+                ["play", "-qn", "synth", "0.15", "sin", "880",
+                 "synth", "0.15", "sin", "1318.5",
+                 "synth", "0.2", "sin", "1760",
+                 "gain", "-10"],
+                capture_output=True, timeout=5,
+            )
+            print("[Bluetooth] Test sound played (sox)")
+            return True
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"[Bluetooth] sox play failed: {e}")
+
+        # Fallback: speaker-test (single beep)
+        try:
+            subprocess.run(
+                ["speaker-test", "-t", "sine", "-f", "880",
+                 "-l", "1", "-p", "1"],
+                capture_output=True, timeout=5,
+            )
+            print("[Bluetooth] Test sound played (speaker-test)")
+            return True
+        except Exception as e:
+            print(f"[Bluetooth] Test sound failed: {e}")
+            return False
+
     def get_status(self) -> dict:
         """Return current Bluetooth connection status."""
         with self._lock:
