@@ -243,10 +243,9 @@ class BluetoothSpeaker:
         try:
             subprocess.run(
                 ["play", "-qn", "-t", "pulseaudio",
-                 "synth", "0.25", "pluck", "659.3",
-                 "synth", "0.35", "pluck", "880",
-                 "delay", "0", "0.3",
-                 "remix", "-", "gain", "-18"],
+                 "synth", "0.3", "pluck", "659.3",
+                 ":", "synth", "0.4", "pluck", "880",
+                 "gain", "-15"],
                 capture_output=True, timeout=5,
             )
             print("[Bluetooth] Test sound played (sox/pulse)")
