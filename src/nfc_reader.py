@@ -49,6 +49,9 @@ def _install_gpio_shim():
     needs (setmode, setup, output, cleanup) using gpiozero, which
     talks through the kernel-friendly lgpio/gpiochip interface.
     """
+    import warnings
+    warnings.filterwarnings("ignore", "This channel is already in use")
+
     if "RPi.GPIO" in sys.modules and not hasattr(
         sys.modules["RPi.GPIO"], "_is_shim"
     ):
