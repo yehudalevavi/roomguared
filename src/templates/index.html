@@ -176,6 +176,31 @@
   </button>
 </div>
 
+<!-- Games Timer -->
+<div class="card">
+  <div class="card-title"><span class="card-icon">⏱️</span> <span data-i18n="games_timer">טיימר משחקים</span></div>
+  <div class="status-row">
+    <span data-i18n="timer_status">טיימר</span>
+    <span class="badge badge-muted" id="timerBadge">—</span>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="btn btn-off" id="timerBtn1" onclick="setTimerInterval(1)" style="flex:1;min-width:40px;padding:12px 0;">1s</button>
+    <button class="btn btn-off" id="timerBtn2" onclick="setTimerInterval(2)" style="flex:1;min-width:40px;padding:12px 0;">2s</button>
+    <button class="btn btn-off" id="timerBtn3" onclick="setTimerInterval(3)" style="flex:1;min-width:40px;padding:12px 0;">3s</button>
+    <button class="btn btn-off" id="timerBtn4" onclick="setTimerInterval(4)" style="flex:1;min-width:40px;padding:12px 0;">4s</button>
+    <button class="btn btn-off" id="timerBtn5" onclick="setTimerInterval(5)" style="flex:1;min-width:40px;padding:12px 0;">5s</button>
+    <button class="btn btn-off" id="timerBtn6" onclick="setTimerInterval(6)" style="flex:1;min-width:40px;padding:12px 0;">6s</button>
+    <button class="btn btn-off" id="timerBtn7" onclick="setTimerInterval(7)" style="flex:1;min-width:40px;padding:12px 0;">7s</button>
+    <button class="btn btn-off" id="timerBtn8" onclick="setTimerInterval(8)" style="flex:1;min-width:40px;padding:12px 0;">8s</button>
+    <button class="btn btn-off" id="timerBtn9" onclick="setTimerInterval(9)" style="flex:1;min-width:40px;padding:12px 0;">9s</button>
+  </div>
+  <div id="timerCountdown" style="text-align:center;font-size:3rem;font-weight:900;color:var(--yellow);display:none;margin:12px 0;"></div>
+  <button class="btn btn-green" id="timerStartBtn" onclick="startTimer()">
+    <span>⏱️</span> <span data-i18n="timer_start">התחל טיימר</span>
+  </button>
+  <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;text-align:center;" data-i18n="timer_hint">הצמד כרטיס NFC או לחץ כאן להפעלת הטיימר</p>
+</div>
+
 <!-- Melodies -->
 <div class="card">
   <div class="card-title"><span class="card-icon">🎵</span> <span data-i18n="play_melody">נגן מנגינה</span></div>
@@ -218,6 +243,7 @@
         <option value="stop_melody" data-i18n="nfc_action_stop">עצור מנגינה</option>
         <option value="next_melody" data-i18n="nfc_action_next">מנגינה הבאה</option>
         <option value="prev_melody" data-i18n="nfc_action_prev">מנגינה קודמת</option>
+        <option value="start_timer" data-i18n="nfc_action_start_timer">⏱️ התחל טיימר</option>
         <option value="play_random_song" data-i18n="nfc_action_spotify_random">🎧 נגן שיר אקראי (Spotify)</option>
         <option value="spotify_pause" data-i18n="nfc_action_spotify_pause">🎧 השהה/המשך (Spotify)</option>
         <option value="spotify_next" data-i18n="nfc_action_spotify_next">🎧 שיר הבא (Spotify)</option>
@@ -410,6 +436,14 @@ const LANG = {
     nfc_action_spotify_pause: '🎧 השהה/המשך (Spotify)',
     nfc_action_spotify_next: '🎧 שיר הבא (Spotify)',
     nfc_action_spotify_prev: '🎧 שיר קודם (Spotify)',
+    nfc_action_start_timer: '⏱️ התחל טיימר',
+    games_timer: 'טיימר משחקים',
+    timer_status: 'טיימר',
+    timer_start: 'התחל טיימר',
+    timer_hint: 'הצמד כרטיס NFC או לחץ כאן להפעלת הטיימר',
+    timer_active: '⏱️ פועל',
+    timer_ready: '○ מוכן',
+    timer_done: 'נגמר!',
   },
   en: {
     title: 'Room Guard',
@@ -484,6 +518,14 @@ const LANG = {
     nfc_action_spotify_pause: '🎧 Pause/Resume (Spotify)',
     nfc_action_spotify_next: '🎧 Next track (Spotify)',
     nfc_action_spotify_prev: '🎧 Previous track (Spotify)',
+    nfc_action_start_timer: '⏱️ Start Timer',
+    games_timer: 'Games Timer',
+    timer_status: 'Timer',
+    timer_start: 'Start Timer',
+    timer_hint: 'Tap an NFC card or press here to start the timer',
+    timer_active: '⏱️ Active',
+    timer_ready: '○ Ready',
+    timer_done: 'Done!',
   }
 };
 
@@ -571,6 +613,48 @@ document.querySelectorAll('#lcdLine1, #lcdLine2').forEach(el => {
   });
 });
 
+// ── Games Timer ──
+let _timerInterval = 5;
+
+function highlightTimerBtn(n) {
+  for (let i = 1; i <= 9; i++) {
+    const btn = document.getElementById('timerBtn' + i);
+    if (i === n) {
+      btn.className = 'btn btn-blue';
+      btn.style.flex = '1';
+      btn.style.minWidth = '40px';
+      btn.style.padding = '12px 0';
+    } else {
+      btn.className = 'btn btn-off';
+      btn.style.flex = '1';
+      btn.style.minWidth = '40px';
+      btn.style.padding = '12px 0';
+    }
+  }
+}
+
+async function setTimerInterval(n) {
+  _timerInterval = n;
+  highlightTimerBtn(n);
+  try {
+    await fetch(API + '/api/timer/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interval: n })
+    });
+  } catch(e) { console.error(e); }
+}
+
+async function startTimer() {
+  const btn = document.getElementById('timerStartBtn');
+  btn.disabled = true;
+  try {
+    await fetch(API + '/api/timer/start', { method: 'POST' });
+    refreshStatus();
+  } catch(e) { console.error(e); }
+  setTimeout(() => { btn.disabled = false; }, 1000);
+}
+
 async function refreshStatus() {
   try {
     const r = await fetch(API + '/api/status');
@@ -607,6 +691,20 @@ async function refreshStatus() {
       lt.className = 'btn btn-off';
       lt.innerHTML = `<span>💡</span> <span>${t('turn_on')}</span>`;
     }
+
+    // Games Timer
+    const tb = document.getElementById('timerBadge');
+    if (d.timer_active) {
+      tb.textContent = t('timer_active');
+      tb.className = 'badge badge-yellow';
+    } else {
+      tb.textContent = t('timer_ready');
+      tb.className = 'badge badge-muted';
+    }
+    if (d.timer_interval && d.timer_interval !== _timerInterval) {
+      _timerInterval = d.timer_interval;
+    }
+    highlightTimerBtn(_timerInterval);
   } catch(e) { console.error(e); }
 }
 
@@ -640,6 +738,7 @@ const NFC_ACTION_LABELS = {
   stop_melody: () => t('nfc_action_stop'),
   next_melody: () => t('nfc_action_next'),
   prev_melody: () => t('nfc_action_prev'),
+  start_timer: () => t('nfc_action_start_timer'),
   play_random_song: () => t('nfc_action_spotify_random'),
   spotify_pause: () => t('nfc_action_spotify_pause'),
   spotify_next: () => t('nfc_action_spotify_next'),

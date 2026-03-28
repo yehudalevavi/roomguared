@@ -393,6 +393,9 @@ class NFCReader:
             elif action == "stop_melody":
                 self._guard.stop_melody()
                 self._beep_confirm()
+            elif action == "start_timer":
+                self._beep_confirm()
+                self._guard.start_timer()
             elif action == "next_melody":
                 name = self._guard.next_melody()
                 print(f"[NFC Reader] Next: {name}")

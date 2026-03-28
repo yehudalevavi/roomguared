@@ -143,6 +143,32 @@ def api_toggle_arm():
     return jsonify({"ok": True, "armed": armed})
 
 
+# --- Games Timer API ---
+
+@app.route("/api/timer/set", methods=["POST"])
+def api_timer_set():
+    """Set the games timer interval (1-9 seconds)."""
+    data = request.get_json(silent=True) or {}
+    interval = data.get("interval")
+    if interval is None:
+        return jsonify({"ok": False, "error": "interval is required (1-9)"}), 400
+    try:
+        interval = int(interval)
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "error": "interval must be a number (1-9)"}), 400
+    if not 1 <= interval <= 9:
+        return jsonify({"ok": False, "error": "interval must be 1-9"}), 400
+    result = guard.set_timer_interval(interval)
+    return jsonify({"ok": True, "timer_interval": result})
+
+
+@app.route("/api/timer/start", methods=["POST"])
+def api_timer_start():
+    """Start the games timer countdown (triggered by NFC or web UI)."""
+    guard.start_timer()
+    return jsonify({"ok": True, "timer_active": True, "timer_interval": guard.get_timer_interval()})
+
+
 # --- NFC API ---
 
 @app.route("/api/nfc/cards")
@@ -166,7 +192,7 @@ def api_nfc_register():
     if not uid or not action:
         return jsonify({"ok": False, "error": "uid and action are required"}), 400
     valid_actions = ["toggle_arm", "toggle_led", "play_random", "stop_melody",
-                     "next_melody", "prev_melody",
+                     "next_melody", "prev_melody", "start_timer",
                      "play_random_song", "spotify_pause", "spotify_next", "spotify_prev"]
     if action not in valid_actions and not action.startswith("play_melody:") and not action.startswith("play_track:"):
         return jsonify({"ok": False, "error": f"Invalid action. Valid: {valid_actions} or play_melody:<name> or play_track:<spotify_uri>"}), 400

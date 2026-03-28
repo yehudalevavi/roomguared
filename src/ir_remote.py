@@ -39,6 +39,16 @@ ELEGOO_SCANCODE_MAP = {
     0x16: "spotify_prev",    # << button — previous Spotify track
     0x19: "volume_up",       # VOL+ button
     0x0D: "volume_down",     # VOL- button
+    # Digit buttons — set games timer interval (1-9 seconds)
+    0x0C: "set_timer:1",     # 1 button
+    0x18: "set_timer:2",     # 2 button
+    0x5E: "set_timer:3",     # 3 button
+    0x08: "set_timer:4",     # 4 button
+    0x1C: "set_timer:5",     # 5 button
+    0x5A: "set_timer:6",     # 6 button
+    0x42: "set_timer:7",     # 7 button
+    0x52: "set_timer:8",     # 8 button
+    0x4A: "set_timer:9",     # 9 button
 }
 
 
@@ -189,5 +199,9 @@ class IRRemote:
                     print(f"[IR Remote] Volume: {max(0, current - 10)}%")
                 except Exception:
                     self._guard.spotify_volume(40)
+            elif action.startswith("set_timer:"):
+                seconds = int(action.split(":")[1])
+                self._guard.set_timer_interval(seconds)
+                print(f"[IR Remote] Timer interval: {seconds}s")
         except Exception as e:
             print(f"[IR Remote] Action '{action}' failed: {e}")

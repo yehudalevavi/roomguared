@@ -27,6 +27,7 @@ from buzzer import (
     MELODY_ARM,
     MELODY_DISARM,
     MELODY_SENSOR_ERROR,
+    MELODY_TIMER_DONE,
     melody_duration,
 )
 from melody_library import MOTION_MELODIES, get_random_melody
@@ -288,6 +289,15 @@ class TestPredefinedMelodies(unittest.TestCase):
 
     def test_sensor_error_melody(self):
         self._validate_melody(MELODY_SENSOR_ERROR, "MELODY_SENSOR_ERROR")
+
+    def test_timer_done_melody(self):
+        self._validate_melody(MELODY_TIMER_DONE, "MELODY_TIMER_DONE")
+
+    def test_timer_done_is_about_2_seconds(self):
+        """Timer done melody should be approximately 2 seconds."""
+        duration = melody_duration(MELODY_TIMER_DONE)
+        self.assertGreater(duration, 1.0)
+        self.assertLess(duration, 3.0)
 
     def test_arm_is_short(self):
         """The arm confirmation should be short and snappy."""

@@ -12,7 +12,7 @@ import sys
 import time
 from datetime import datetime
 
-from buzzer import Buzzer, MELODY_STARTUP, MELODY_ARM, MELODY_DISARM, NOTE_C4, NOTE_C5, melody_duration
+from buzzer import Buzzer, MELODY_STARTUP, MELODY_ARM, MELODY_DISARM, MELODY_TIMER_DONE, NOTE_C4, NOTE_C5, melody_duration
 from melody_library import MOTION_MELODIES, get_random_melody
 from lcd_display import LCDDisplay
 from bluetooth_speaker import BluetoothSpeaker
@@ -65,6 +65,12 @@ class RoomGuard:
         self._lcd_thread: threading.Thread | None = None
         self._lcd_flash_until: float = 0  # timestamp when flash message expires
         self._lcd_lock = threading.Lock()  # protects all LCD hardware writes
+
+        # Games timer state
+        self._timer_interval = 5   # seconds (1-9), default 5
+        self._timer_active = False
+        self._timer_cancel = threading.Event()
+        self._timer_thread: threading.Thread | None = None
 
     def start(self) -> None:
         """Initialize hardware devices."""
@@ -267,6 +273,8 @@ class RoomGuard:
                 "cooldown": self.cooldown,
                 "current_melody": MOTION_MELODIES[self._melody_index][0],
                 "current_melody_index": self._melody_index,
+                "timer_interval": self._timer_interval,
+                "timer_active": self._timer_active,
             }
         # Media status (outside main lock to avoid deadlock)
         try:
@@ -378,12 +386,107 @@ class RoomGuard:
             self._log_message(f"Spotify volume failed: {e}")
             return False
 
+    # --- Games Timer ---
+
+    def set_timer_interval(self, seconds: int) -> int:
+        """Set the games timer interval (1-9 seconds). Returns the clamped value."""
+        seconds = max(1, min(9, int(seconds)))
+        with self._lock:
+            self._timer_interval = seconds
+        self._lcd_flash("Timer set:", f"{seconds}s")
+        self._log_message(f"Timer interval: {seconds}s")
+        return seconds
+
+    def get_timer_interval(self) -> int:
+        """Return the current timer interval."""
+        with self._lock:
+            return self._timer_interval
+
+    def start_timer(self) -> bool:
+        """Start the games timer countdown. Returns False if already running."""
+        with self._lock:
+            if self._timer_active:
+                # Cancel existing timer and restart
+                self._timer_cancel.set()
+            interval = self._timer_interval
+        # Small delay to let previous timer thread exit
+        if self._timer_thread and self._timer_thread.is_alive():
+            self._timer_cancel.set()
+            self._timer_thread.join(timeout=1)
+        with self._lock:
+            self._timer_active = True
+            self._timer_cancel.clear()
+        self._log_message(f"Timer started: {interval}s")
+        self._timer_thread = threading.Thread(
+            target=self._timer_countdown,
+            args=(interval,),
+            daemon=True,
+        )
+        self._timer_thread.start()
+        return True
+
+    def _timer_countdown(self, seconds: int) -> None:
+        """Timer thread: flash LED each second, show countdown on LCD, play melody at end."""
+        cancel = self._timer_cancel
+        try:
+            # Stop any playing melody to free the buzzer
+            self._buzzer.cancel()
+            with self._lock:
+                self._playing = False
+
+            for remaining in range(seconds, 0, -1):
+                if cancel.is_set():
+                    break
+                # Show countdown on LCD (override normal cycling)
+                self._lcd_flash_until = time.monotonic() + 2
+                self._lcd_show(f"  TIMER  {remaining}s", "  * " * (remaining))
+                # Flash LED on
+                if self._led:
+                    self._led.on()
+                # Wait half-second with LED on
+                if cancel.wait(0.5):
+                    break
+                # Flash LED off
+                if self._led and not self._led_on:
+                    self._led.off()
+                # Wait remaining half-second
+                if cancel.wait(0.5):
+                    break
+
+            if not cancel.is_set():
+                # Time's up — flicker LED rapidly
+                self._lcd_flash_until = time.monotonic() + 3
+                self._lcd_show("  TIME'S UP!", "  ** DONE **")
+                for _ in range(10):
+                    if cancel.is_set():
+                        break
+                    if self._led:
+                        self._led.on()
+                    time.sleep(0.08)
+                    if self._led:
+                        self._led.off()
+                    time.sleep(0.08)
+                # Play celebration melody
+                if not cancel.is_set():
+                    self._buzzer.play_melody(MELODY_TIMER_DONE)
+                self._log_message("Timer done!")
+        finally:
+            # Restore LED to user setting
+            if self._led:
+                with self._lock:
+                    if self._led_on:
+                        self._led.on()
+                    else:
+                        self._led.off()
+            with self._lock:
+                self._timer_active = False
+
     # --- Internal ---
 
     def _on_motion(self, sensor=None) -> None:
         """PIR motion callback — runs in gpiozero's callback thread."""
         with self._lock:
-            if not self._armed or self._playing:
+            if not self._armed or self._playing or self._timer_active:
                 return
             self._playing = True
 
@@ -527,9 +630,14 @@ class RoomGuard:
         """Return the top-line text for the given page."""
         if page == 0:
             with self._lock:
-                state = "ARMED" if self._armed else "DISARMED"
-                if self._playing:
+                if self._timer_active:
+                    state = "TIMER"
+                elif self._playing:
                     state = "PLAYING"
+                elif self._armed:
+                    state = "ARMED"
+                else:
+                    state = "DISARMED"
             return f"Room Guard {state}"
         elif page == 1:
             with self._lock:

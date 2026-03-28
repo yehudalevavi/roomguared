@@ -24,7 +24,7 @@ class TestIRConfig(unittest.TestCase):
         self.assertEqual(IR_PIN, 18)
 
     def test_elegoo_map_has_four_entries(self):
-        self.assertEqual(len(ELEGOO_SCANCODE_MAP), 10)
+        self.assertEqual(len(ELEGOO_SCANCODE_MAP), 19)
 
     def test_elegoo_map_has_prev_melody(self):
         self.assertIn("prev_melody", ELEGOO_SCANCODE_MAP.values())

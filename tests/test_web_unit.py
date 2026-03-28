@@ -237,6 +237,52 @@ class TestWebApp(unittest.TestCase):
         self.assertTrue(d["ok"])
         self.assertIn("armed", d)
 
+    # --- Timer API Tests ---
+
+    def test_timer_set_valid(self):
+        r = self.client.post("/api/timer/set",
+                             data=json.dumps({"interval": 3}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertEqual(d["timer_interval"], 3)
+
+    def test_timer_set_clamps_high(self):
+        r = self.client.post("/api/timer/set",
+                             data=json.dumps({"interval": 99}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_timer_set_clamps_low(self):
+        r = self.client.post("/api/timer/set",
+                             data=json.dumps({"interval": 0}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_timer_set_missing_interval(self):
+        r = self.client.post("/api/timer/set",
+                             data=json.dumps({}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_timer_start_endpoint(self):
+        r = self.client.post("/api/timer/start")
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.data)
+        self.assertTrue(d["ok"])
+        self.assertTrue(d["timer_active"])
+        # Let timer finish (it's 5s by default — just verify it started)
+        import time
+        time.sleep(0.1)
+        guard._timer_cancel.set()  # cancel to not block other tests
+
+    def test_status_includes_timer_fields(self):
+        r = self.client.get("/api/status")
+        d = json.loads(r.data)
+        self.assertIn("timer_interval", d)
+        self.assertIn("timer_active", d)
+
     def test_nfc_cards_no_reader(self):
         r = self.client.get("/api/nfc/cards")
         self.assertEqual(r.status_code, 200)
@@ -383,6 +429,51 @@ class TestRoomGuardClass(unittest.TestCase):
         guard.next_melody()
         status = guard.get_status()
         self.assertEqual(status["current_melody_index"], 1)
+
+    # --- Timer Tests ---
+
+    def test_set_timer_interval_valid(self):
+        result = guard.set_timer_interval(7)
+        self.assertEqual(result, 7)
+        self.assertEqual(guard._timer_interval, 7)
+
+    def test_set_timer_interval_clamps_low(self):
+        result = guard.set_timer_interval(0)
+        self.assertEqual(result, 1)
+
+    def test_set_timer_interval_clamps_high(self):
+        result = guard.set_timer_interval(10)
+        self.assertEqual(result, 9)
+
+    def test_get_timer_interval(self):
+        guard._timer_interval = 4
+        self.assertEqual(guard.get_timer_interval(), 4)
+
+    def test_start_timer_sets_active(self):
+        guard.start_timer()
+        self.assertTrue(guard._timer_active)
+        # Cleanup
+        guard._timer_cancel.set()
+        import time
+        time.sleep(0.2)
+
+    def test_timer_active_in_status(self):
+        guard._timer_active = True
+        guard._timer_interval = 3
+        status = guard.get_status()
+        self.assertTrue(status["timer_active"])
+        self.assertEqual(status["timer_interval"], 3)
+        guard._timer_active = False
+
+    def test_motion_skipped_during_timer(self):
+        """_on_motion should be a no-op when timer is active."""
+        guard._armed = True
+        guard._timer_active = True
+        guard._playing = False
+        guard._on_motion()
+        # Should not increment motion count since timer is active
+        self.assertEqual(guard._motion_count, 0)
+        guard._timer_active = False
 
 
 class TestBluetoothAPI(unittest.TestCase):

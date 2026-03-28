@@ -74,6 +74,19 @@ MELODY_SENSOR_ERROR = [
     (NOTE_C4, 0.20),
 ]
 
+MELODY_TIMER_DONE = [
+    # Upbeat celebration fanfare (~2 seconds)
+    (NOTE_G5, 0.12), (REST, 0.03),
+    (NOTE_G5, 0.12), (REST, 0.03),
+    (NOTE_G5, 0.12), (REST, 0.06),
+    (NOTE_E5, 0.15), (REST, 0.05),
+    (NOTE_G5, 0.15), (REST, 0.05),
+    (NOTE_A5, 0.12), (REST, 0.03),
+    (NOTE_A5, 0.12), (REST, 0.06),
+    (NOTE_G5, 0.20), (REST, 0.08),
+    (NOTE_C6, 0.35),
+]
+
 
 def melody_duration(melody: list[tuple[float, float]]) -> float:
     """Calculate the total duration of a melody in seconds."""

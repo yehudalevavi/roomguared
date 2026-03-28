@@ -688,3 +688,70 @@ See `docs/SPOTIFY_SETUP.md` for full setup guide including:
 - OAuth2 authentication flow
 - Bluetooth speaker pairing
 - Troubleshooting
+
+---
+
+## Phase 11: Games Timer
+
+**Status: ✅ Complete**
+
+**Goal:** A countdown timer for physical games, triggered by NFC card tap. Timer takes highest priority on the device — overrides motion alarm on LCD and LED.
+
+### How It Works
+
+1. **Set interval** (1–9 seconds) via web dashboard buttons, IR remote digit keys (1-9), or default (5s)
+2. **Start timer** by tapping an NFC card mapped to `start_timer`, pressing the web dashboard button, or calling the API
+3. **Countdown**: LED flashes on/off each second, LCD shows remaining time
+4. **Time's up**: LED flickers rapidly (10× fast blink), then a 2-second celebration melody (`MELODY_TIMER_DONE`) plays
+5. **Ready**: Device returns to normal — LED restores to user setting, LCD resumes cycling
+
+### Priority
+
+While the timer is active:
+- Motion alarm is suppressed (`_on_motion` returns early)
+- LCD shows timer countdown (overrides page cycling)
+- LED is under timer control (flashing)
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `src/buzzer.py` | Added `MELODY_TIMER_DONE` — 2s celebration fanfare |
+| `src/room_guard.py` | Added `_timer_active`, `_timer_interval`, `set_timer_interval()`, `start_timer()`, `_timer_countdown()` thread. Timer state in `get_status()`. Motion suppressed during timer. |
+| `src/web_app.py` | Added `POST /api/timer/set`, `POST /api/timer/start`. Added `start_timer` to NFC valid actions. |
+| `src/ir_remote.py` | Mapped digit buttons 1-9 to `set_timer:N` action |
+| `src/nfc_reader.py` | Added `start_timer` action dispatch |
+| `src/templates/index.html` | New "Games Timer" card with 1-9 interval buttons, start button, active badge. Hebrew + English i18n. |
+| `tests/test_web_unit.py` | Timer API tests + RoomGuard timer state tests |
+| `tests/test_buzzer_unit.py` | `MELODY_TIMER_DONE` validation + duration test |
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/timer/set` | Set interval (JSON: `{"interval": 5}`, range 1-9) |
+| POST | `/api/timer/start` | Start countdown |
+
+Timer state is included in `GET /api/status`:
+- `timer_interval` — current interval (1-9)
+- `timer_active` — true during countdown
+
+### IR Remote Mapping
+
+| Button | Scancode | Action |
+|--------|----------|--------|
+| 1 | `0x0C` | Set timer to 1s |
+| 2 | `0x18` | Set timer to 2s |
+| 3 | `0x5E` | Set timer to 3s |
+| 4 | `0x08` | Set timer to 4s |
+| 5 | `0x1C` | Set timer to 5s |
+| 6 | `0x5A` | Set timer to 6s |
+| 7 | `0x42` | Set timer to 7s |
+| 8 | `0x52` | Set timer to 8s |
+| 9 | `0x4A` | Set timer to 9s |
+
+### NFC Card Action
+
+| Action | Description |
+|--------|-------------|
+| `start_timer` | Start the games timer countdown |

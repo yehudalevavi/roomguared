@@ -17,6 +17,7 @@ Grab the remote and control the Room Guard from across the room:
 - **⏮ / ⏭ Prev / Next** — browse through all 20 melodies
 - **⏯ Play/Pause** — play the selected melody or stop the current one
 - **🔴 Red button** — arm or disarm the alarm (with a confirmation jingle)
+- **1-9 digit buttons** — set the games timer interval (1–9 seconds)
 
 No phone, no laptop, no SSH — just point and press. The IR remote works alongside the web dashboard, so you can use whichever is more convenient.
 
@@ -27,6 +28,7 @@ Control everything from your phone or laptop at **`http://room-guard:5000`**:
 - **Arm / Disarm** the motion sensor with a single toggle button
 - **Toggle the LED** on and off
 - **Play any of the 20 melodies** on demand from a dropdown
+- **Games Timer** — set a 1–9 second countdown, triggered by NFC tap or button press
 - **Live status** — motion count, last event, armed state (auto-refreshes)
 - **Activity log** — scrollable event log with melody names
 
@@ -39,6 +41,7 @@ No app install needed — just open a browser on any device on your local networ
 - LED + 220Ω resistor
 - Passive buzzer (no white sticker on top — unlike the active buzzer)
 - IR receiver module (VS1838B) + IR remote control
+- MFRC522 NFC/RFID card reader
 - Breadboard + jumper wires
 - microSD card (16GB+)
 
@@ -105,6 +108,7 @@ src/
 ├── buzzer.py            # Passive buzzer PWM driver + system melodies
 ├── melody_library.py    # 20 famous melodies for random motion alerts
 ├── ir_remote.py         # IR remote control handler (NEC protocol via evdev)
+├── nfc_reader.py         # NFC/RFID card reader (MFRC522 via SPI)
 ├── templates/
 │   └── index.html       # Web dashboard — dark-themed, responsive, no CDN
 ├── dht11_sensor.py      # DHT11 temperature sensor module (pending hardware)
@@ -139,6 +143,8 @@ The dashboard communicates via a REST API. You can also call these endpoints dir
 | POST | `/api/melody/play` | Play current melody |
 | POST | `/api/melody/stop` | Stop playing melody |
 | POST | `/api/toggle-arm` | Toggle arm/disarm with sound cue |
+| POST | `/api/timer/set` | Set games timer interval (JSON body: `{"interval": 5}`, range 1-9) |
+| POST | `/api/timer/start` | Start the games timer countdown |
 | GET | `/api/melodies` | List all 20 available melody names |
 | GET | `/api/logs?limit=50` | Recent activity log entries (JSON) |
 | POST | `/api/lcd/message` | Show custom message on LCD for 10 seconds (JSON body: `{"line1":"…","line2":"…"}`) |
