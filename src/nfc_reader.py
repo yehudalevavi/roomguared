@@ -174,8 +174,23 @@ class NFCReader:
     def start(self) -> None:
         """Initialize the MFRC522 reader and start the polling thread."""
         _install_gpio_shim()
+        import sys
+        GPIO = sys.modules["RPi.GPIO"]
+
+        # Hard-reset the MFRC522 via RST pin to ensure clean state
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(22, GPIO.OUT)
+        GPIO.output(22, GPIO.LOW)
+        time.sleep(0.05)
+        GPIO.output(22, GPIO.HIGH)
+        time.sleep(0.05)
+
         from mfrc522 import SimpleMFRC522
         self._reader = SimpleMFRC522()
+
+        # Set receiver gain to maximum (48 dB) for reliable card detection
+        self._reader.READER.Write_MFRC522(0x26, 0x70)
+
         self._running = True
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
