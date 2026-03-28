@@ -434,6 +434,12 @@ class RoomGuard:
             with self._lock:
                 self._playing = False
 
+            # Short start beep
+            try:
+                self._buzzer.play_tone(NOTE_C5, 0.1)
+            except RuntimeError:
+                pass
+
             for remaining in range(seconds, 0, -1):
                 if cancel.is_set():
                     break
@@ -454,9 +460,15 @@ class RoomGuard:
                     break
 
             if not cancel.is_set():
-                # Time's up — flicker LED rapidly
+                # Time's up — play melody and flicker LED simultaneously
                 self._lcd_flash_until = time.monotonic() + 3
                 self._lcd_show("  TIME'S UP!", "  ** DONE **")
+                melody_thread = threading.Thread(
+                    target=self._buzzer.play_melody,
+                    args=(MELODY_TIMER_DONE,),
+                    daemon=True,
+                )
+                melody_thread.start()
                 for _ in range(10):
                     if cancel.is_set():
                         break
@@ -466,9 +478,7 @@ class RoomGuard:
                     if self._led:
                         self._led.off()
                     time.sleep(0.08)
-                # Play celebration melody
-                if not cancel.is_set():
-                    self._buzzer.play_melody(MELODY_TIMER_DONE)
+                melody_thread.join(timeout=3)
                 self._log_message("Timer done!")
         finally:
             # Restore LED to user setting
