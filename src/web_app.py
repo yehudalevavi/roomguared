@@ -253,6 +253,14 @@ def api_nfc_last_scan():
     return jsonify({"ok": True, "last_scan": scan, "available": True})
 
 
+@app.route("/api/nfc/debug")
+def api_nfc_debug():
+    """Return NFC reader debug diagnostics (not shown in web UI logs)."""
+    if nfc_reader is None:
+        return jsonify({"ok": True, "available": False})
+    return jsonify({"ok": True, "available": True, **nfc_reader.get_debug_info()})
+
+
 # --- Bluetooth API ---
 
 @app.route("/api/bluetooth/status")

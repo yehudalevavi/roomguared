@@ -169,6 +169,11 @@ class NFCReader:
         self._scan_waiting = False
         self._scan_deadline: float = 0.0
 
+        # Debug counters (only printed to stdout/journalctl, NOT web UI)
+        self._poll_count = 0
+        self._error_count = 0
+        self._last_heartbeat = 0.0
+
         self._load_config()
 
     def start(self) -> None:
@@ -182,21 +187,47 @@ class NFCReader:
         rst.on()
         time.sleep(0.05)
         rst.close()
+        print("[NFC DEBUG] MFRC522 hardware reset complete")
 
         from mfrc522 import SimpleMFRC522
         self._reader = SimpleMFRC522()
+        print(f"[NFC DEBUG] SimpleMFRC522 created: {self._reader}")
 
         # Set receiver gain to maximum (48 dB) for reliable card detection
         self._reader.READER.Write_MFRC522(0x26, 0x70)
+        print("[NFC DEBUG] Receiver gain set to max (48 dB)")
 
         self._running = True
+        self._poll_count = 0
+        self._error_count = 0
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
+        print(f"[NFC DEBUG] Poll thread started: {self._thread.name}, alive={self._thread.is_alive()}")
 
     def stop(self) -> None:
         """Stop the polling thread."""
         self._running = False
         self._reader = None
+        print(f"[NFC DEBUG] stop() called. polls={self._poll_count}, errors={self._error_count}")
+
+    @property
+    def is_healthy(self) -> bool:
+        """True if the poll thread is still alive and the reader is set."""
+        return (self._running
+                and self._thread is not None
+                and self._thread.is_alive()
+                and self._reader is not None)
+
+    def get_debug_info(self) -> dict:
+        """Return debug diagnostics (for journalctl/API, not web UI logs)."""
+        return {
+            "running": self._running,
+            "thread_alive": self._thread.is_alive() if self._thread else False,
+            "reader_set": self._reader is not None,
+            "poll_count": self._poll_count,
+            "error_count": self._error_count,
+            "scan_mode": self._scan_waiting,
+        }
 
     def get_registered_cards(self) -> list[dict]:
         """Return a copy of all registered cards."""
@@ -315,21 +346,50 @@ class NFCReader:
 
     def _poll_loop(self) -> None:
         """Background thread: poll for NFC cards and dispatch actions."""
-        while self._running:
-            try:
-                reader = self._reader
-                if reader is None:
-                    break
-                # read_id_no_block returns (id, _) or (None, None)
-                uid_int = reader.read_id_no_block()
-                if uid_int is not None:
-                    # Convert integer UID to byte-based hex string
-                    uid_hex = hex(uid_int).upper().replace("0X", "0x")
-                    self._handle_card(uid_hex)
-            except Exception as e:
-                if self._running:
-                    print(f"[NFC Reader] Poll error: {e}")
-            time.sleep(POLL_INTERVAL)
+        import traceback
+        HEARTBEAT_INTERVAL = 60  # Log a heartbeat every 60 seconds
+        self._last_heartbeat = time.monotonic()
+        print("[NFC DEBUG] Poll loop thread started")
+
+        try:
+            while self._running:
+                try:
+                    reader = self._reader
+                    if reader is None:
+                        print("[NFC DEBUG] Reader is None — exiting poll loop")
+                        break
+
+                    uid_int = reader.read_id_no_block()
+                    self._poll_count += 1
+
+                    if uid_int is not None:
+                        uid_hex = hex(uid_int).upper().replace("0X", "0x")
+                        print(f"[NFC DEBUG] Card detected: {uid_hex} (poll #{self._poll_count})")
+                        self._handle_card(uid_hex)
+
+                    # Periodic heartbeat (journalctl only, not web UI)
+                    now = time.monotonic()
+                    if now - self._last_heartbeat >= HEARTBEAT_INTERVAL:
+                        print(f"[NFC DEBUG] Heartbeat: {self._poll_count} polls, "
+                              f"{self._error_count} errors, "
+                              f"reader={'alive' if self._reader is not None else 'None'}, "
+                              f"scan_mode={self._scan_waiting}")
+                        self._last_heartbeat = now
+
+                except Exception as e:
+                    self._error_count += 1
+                    if self._running:
+                        print(f"[NFC DEBUG] Poll error #{self._error_count}: {type(e).__name__}: {e}")
+                        if self._error_count <= 5 or self._error_count % 50 == 0:
+                            traceback.print_exc()
+
+                time.sleep(POLL_INTERVAL)
+        except BaseException as e:
+            print(f"[NFC DEBUG] Poll loop KILLED by {type(e).__name__}: {e}")
+            traceback.print_exc()
+        finally:
+            print(f"[NFC DEBUG] Poll loop exited. Total polls: {self._poll_count}, "
+                  f"errors: {self._error_count}, running={self._running}")
 
     def _handle_card(self, uid: str) -> None:
         """Process a detected card UID with debounce."""

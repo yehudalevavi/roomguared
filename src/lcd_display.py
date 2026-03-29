@@ -47,6 +47,7 @@ class LCDDisplay:
         self._lcd = None
         self._line1 = ""
         self._line2 = ""
+        self._debug_write_count = 0
 
     def start(self) -> None:
         """Initialize the LCD hardware."""
@@ -138,7 +139,12 @@ class LCDDisplay:
             raise RuntimeError("LCD not started. Call start() first.")
         window = text[offset:offset + self.cols].ljust(self.cols)
         target = f"_line{row + 1}"
-        if getattr(self, target) != window:
+        old = getattr(self, target)
+        if old != window:
             self._lcd.cursor_pos = (row, 0)
             self._lcd.write_string(window)
             setattr(self, target, window)
+            self._debug_write_count += 1
+            if self._debug_write_count <= 5 or self._debug_write_count % 200 == 0:
+                print(f"[LCD DEBUG] write_at_offset row={row} off={offset} "
+                      f"old={old!r:.20} new={window!r:.20} (write #{self._debug_write_count})")
